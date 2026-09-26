@@ -78,7 +78,7 @@ A marketing strategy spike will be used to research:
 - Other potential marketing channels
 
 ## 🛠️ Technology
-| Technology | Purpose |
+|Technology |Purpose |
 |------------|---------|
 | React | Frontend |
 | Node.js | Backend |
@@ -104,10 +104,10 @@ Installation:
 3. Install the required dependencies.
 4.  Start the development server.
 Example:
-- git clone <repository-url>
-- cd <project-directory>
-- <install-command>
-- <start-command>
+- git clone repository-url
+- cd project-directory
+- install-command
+- start-command
 
 ## 📁 Project Structure
 - This section can be updated as the project structure is established.
