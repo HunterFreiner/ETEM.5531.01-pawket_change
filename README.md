@@ -78,7 +78,7 @@ A marketing strategy spike will be used to research:
 - Other potential marketing channels
 
 ## 🛠️ Technology
-|Technology |Purpose |
+| Technology | Purpose |
 |------------|---------|
 | React | Frontend |
 | Node.js | Backend |
@@ -97,7 +97,9 @@ A marketing strategy spike will be used to research:
 
 ## 🚀 Getting Started
 Prerequisites:
+
 Add required software, runtimes, or dependencies here once the technology stack has been established.
+
 Installation:
 1. Clone the repository.
 2. Navigate to the project directory.
