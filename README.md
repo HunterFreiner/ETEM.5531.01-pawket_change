@@ -97,12 +97,13 @@ A marketing strategy spike will be used to research:
 
 ## 🚀 Getting Started
 Prerequisites:
-- Add required software, runtimes, or dependencies here once the technology stack has been established.
+Add required software, runtimes, or dependencies here once the technology stack has been established.
 Installation:
 1. Clone the repository.
 2. Navigate to the project directory.
 3. Install the required dependencies.
 4.  Start the development server.
+
 Example:
 - git clone repository-url
 - cd project-directory
