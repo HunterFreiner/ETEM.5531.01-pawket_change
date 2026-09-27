@@ -80,8 +80,8 @@ A marketing strategy spike will be used to research:
 ## 🛠️ Technology
 | Technology | Purpose |
 |------------|---------|
-| React | Frontend |
-| Node.js | Backend |
+| HTML/CSS/JavaScript | Frontend |
+| Python + Django | Backend |
 | PostgreSQL | Database |
 | GitHub | Version Control |
 
