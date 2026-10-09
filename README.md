@@ -2,7 +2,7 @@
 
 ## 📋 Overview
 - This project is a website for a pet-care service designed to provide customers with an easy and convenient way to learn about our services, view pricing, and book pet care and grooming services.
-- The goal of the project is to create a professional, user-friendly website that clearly communicates our services and provides a simple booking experience for customers!
+- The goal of the project is to create a professional, user-friendly website that clearly communicates our services and provides a simple booking experience for customers.
 
 ## 🎯 Project Goals
 - Create a professional and welcoming online presence for the pet-care business.
