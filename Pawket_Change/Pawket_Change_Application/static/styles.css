@@ -1,0 +1,119 @@
+/* Colors pulled from the Pawket Change logo */
+:root {
+    --pawket-teal: #375e62;
+    --pawket-dark-teal: #20373a;
+    --pawket-gold: #bc974e;
+    --pawket-bronze: #927237;
+    --pawket-cream: #faf7f0;
+}
+
+body {
+    font-family: 'Arial', sans-serif;
+    background-color: var(--pawket-cream);
+    color: var(--pawket-dark-teal);
+}
+
+.site-header {
+    background-color: var(--pawket-teal);
+    border-bottom: 4px solid var(--pawket-gold);
+}
+
+.site-header .nav-link {
+    color: #ffffff;
+    border-bottom: 2px solid transparent;
+}
+
+.site-header .nav-link:hover,
+.site-header .nav-link.active {
+    color: #ffffff;
+    border-bottom-color: var(--pawket-gold);
+}
+
+.site-footer {
+    background-color: var(--pawket-dark-teal);
+    border-top: 4px solid var(--pawket-gold);
+}
+
+.header-icon {
+    width: 60px;
+    background-color: #ffffff;
+    border: 2px solid var(--pawket-gold);
+    border-radius: 0.5rem;
+    padding: 4px;
+}
+
+.hero-logo {
+    max-width: 500px;
+    width: 100%;
+}
+
+.tagline {
+    color: var(--pawket-teal);
+    font-weight: 600;
+}
+
+.dog-photo {
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    object-fit: cover;
+    border: 3px solid var(--pawket-gold);
+    border-radius: 0.75rem;
+}
+
+.page-title {
+    color: var(--pawket-dark-teal);
+    font-weight: 700;
+}
+
+.mission {
+    max-width: 800px;
+    background-color: #ffffff;
+    border-left: 6px solid var(--pawket-gold);
+    border-radius: 0.75rem;
+    font-size: 1.1rem;
+    line-height: 1.7;
+    text-align: left;
+}
+
+.price-card {
+    background-color: #ffffff;
+    border-top: 6px solid var(--pawket-teal);
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(32, 55, 58, 0.1);
+}
+
+.service-name {
+    color: var(--pawket-teal);
+    font-weight: 700;
+}
+
+.price {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--pawket-dark-teal);
+    line-height: 1.1;
+}
+
+.price-unit {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--pawket-bronze);
+}
+
+.info-panel {
+    background-color: #ffffff;
+    border-left: 6px solid var(--pawket-gold);
+    border-radius: 0.75rem;
+}
+
+.add-on + .add-on {
+    border-top: 1px solid #e6dfcf;
+}
+
+.promise-list li::marker {
+    color: var(--pawket-gold);
+}
+
+.promise-list li + li {
+    margin-top: 0.5rem;
+}

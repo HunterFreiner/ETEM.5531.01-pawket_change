@@ -1,0 +1,49 @@
+{% extends 'base.html' %}
+
+{% block title %}Services | Pawket Change{% endblock %}
+
+{% block content %}
+<div class="container text-center">
+    <h2 class="page-title mb-3">Our Services</h2>
+    <p class="lead tagline">Honest care, honest pricing &mdash; no memberships, no surprises.</p>
+
+    <div class="row g-4 mt-2">
+        {% for service in services %}
+        <div class="col-12 col-md-6 col-lg-3">
+            <div class="price-card h-100 p-4">
+                <h3 class="h5 service-name">{{ service.name }}</h3>
+                <p class="price mb-3">{{ service.price }}<span class="price-unit">{{ service.unit }}</span></p>
+                <p class="mb-0">{{ service.included }}</p>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <div class="row g-4 mt-4 text-start">
+        <div class="col-12 col-lg-6">
+            <section class="info-panel h-100 p-4">
+                <h3 class="page-title h4 mb-3">Optional Add-Ons</h3>
+                <ul class="list-unstyled mb-3">
+                    {% for add_on in add_ons %}
+                    <li class="add-on d-flex justify-content-between py-2">
+                        <span>{{ add_on.name }}</span>
+                        <span class="fw-bold">{{ add_on.price }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                <p class="small mb-0">These are all optional. You only pay for extras you choose.</p>
+            </section>
+        </div>
+        <div class="col-12 col-lg-6">
+            <section class="info-panel h-100 p-4">
+                <h3 class="page-title h4 mb-3">Our Pricing Promise</h3>
+                <ul class="promise-list mb-0">
+                    {% for policy in policies %}
+                    <li>{{ policy }}</li>
+                    {% endfor %}
+                </ul>
+            </section>
+        </div>
+    </div>
+</div>
+{% endblock %}

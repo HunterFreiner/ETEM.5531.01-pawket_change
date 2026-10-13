@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block content %}
+<div class="container text-center">
+    <img src="{% static 'pawket_logo.png' %}" alt="Pawket Change logo" class="hero-logo img-fluid mb-3">
+    <p class="lead tagline">Tender, love, and care for just Pawket Change!</p>
+
+    <section class="mission mx-auto mt-4 p-4">
+        <h2 class="page-title h3 mb-3">Our Mission</h2>
+        <p class="mb-0">
+            At Pawket Change, our mission is to provide exceptional, compassionate care for every pet at a price pet owners can feel good about.
+            Whether it's grooming or a week-long stay, we're committed to treating every pet like family and giving owners peace of mind.
+            From everyday grooming to extended stays, we're here for you and your pet every step of the way.
+        </p>
+    </section>
+
+    <div class="row g-3 mt-4">
+        <div class="col-6 col-lg-3">
+            <img src="{% static 'dog1.jpg' %}" alt="Black and white spaniel running through a field of yellow flowers" class="dog-photo">
+        </div>
+        <div class="col-6 col-lg-3">
+            <img src="{% static 'dog2.jpg' %}" alt="Smiling yellow Labrador retriever" class="dog-photo">
+        </div>
+        <div class="col-6 col-lg-3">
+            <img src="{% static 'dog3.jpg' %}" alt="Happy dog getting a scratch behind the ear" class="dog-photo">
+        </div>
+        <div class="col-6 col-lg-3">
+            <img src="{% static 'dog4.jpg' %}" alt="Corgi mix sitting and looking up" class="dog-photo">
+        </div>
+    </div>
+</div>
+{% endblock %}
