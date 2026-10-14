@@ -87,13 +87,16 @@ A marketing strategy spike will be used to research:
 
 ## 📊 Project Progress
 - [x] Create GitHub repository
-- [ ] Define branding and logo
-- [ ] Create home page
-- [ ] Create About Us page
-- [ ] Define cost structure
+- [x] Define branding and logo
+- [x] Create home page
+- [x] Create About Us page
+- [x] Define cost structure
+- [x] Research marketing strategy
 - [ ] Create pet-care booking flow
 - [ ] Create grooming booking flow
-- [ ] Research marketing strategy
+- [ ] Create booking confirmation and notifications 
+- [ ] Create customer reviews and testimonials
+- [ ] Create contact us page
 
 ## 🚀 Getting Started
 Prerequisites:
