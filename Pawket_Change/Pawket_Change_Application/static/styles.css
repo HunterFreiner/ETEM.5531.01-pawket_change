@@ -117,3 +117,38 @@ body {
 .promise-list li + li {
     margin-top: 0.5rem;
 }
+
+.btn-pawket {
+    background-color: var(--pawket-teal);
+    border: 2px solid var(--pawket-gold);
+    color: #ffffff;
+}
+
+.btn-pawket:hover,
+.btn-pawket:focus {
+    background-color: var(--pawket-dark-teal);
+    border-color: var(--pawket-gold);
+    color: #ffffff;
+}
+
+.team-card {
+    background-color: #ffffff;
+    border-top: 6px solid var(--pawket-teal);
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(32, 55, 58, 0.1);
+}
+
+.team-photo {
+    width: 180px;
+    height: 180px;
+    object-fit: cover;
+    border: 4px solid var(--pawket-gold);
+    border-radius: 50%;
+}
+
+.team-role {
+    color: var(--pawket-bronze);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}

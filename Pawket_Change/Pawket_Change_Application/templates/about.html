@@ -1,10 +1,68 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}About Us | Pawket Change{% endblock %}
 
 {% block content %}
 <div class="container text-center">
     <h2 class="page-title mb-3">About Us</h2>
-    <p class="lead tagline">More about Pawket Change coming soon!</p>
+    <p class="lead tagline">Honest care. Honest pricing. That&rsquo;s the whole idea.</p>
+
+    <section class="mission mx-auto mt-4 p-4">
+        <p class="mb-0">
+            At Pawket Change, we believe caring for your dog should fit into your everyday life&mdash;and your budget.
+            We&rsquo;re here to make dog care simple, affordable, and personal, with clear pricing and a welcoming approach.
+            We&rsquo;ve proudly been open for one year, and we&rsquo;re grateful to every dog and owner who has trusted us along the way.
+        </p>
+    </section>
+
+    <div class="row g-4 mt-2 text-start">
+        <div class="col-12 col-lg-4">
+            <section class="info-panel h-100 p-4">
+                <h3 class="page-title h4 mb-3">Care That Starts with Listening</h3>
+                <p class="mb-0">
+                    Every dog has their own personality, routine, and needs. We take the time to learn what matters to you and your dog,
+                    so you can feel comfortable sharing preferences, asking questions, and planning their care.
+                </p>
+            </section>
+        </div>
+        <div class="col-12 col-lg-4">
+            <section class="info-panel h-100 p-4">
+                <h3 class="page-title h4 mb-3">Clear Price, Clear Choice</h3>
+                <p class="mb-0">
+                    Finding care shouldn&rsquo;t feel complicated. Our approach is straightforward: explain your options,
+                    make costs easy to understand, and help you choose what works for you. No pressure to add extras.
+                </p>
+            </section>
+        </div>
+        <div class="col-12 col-lg-4">
+            <section class="info-panel h-100 p-4">
+                <h3 class="page-title h4 mb-3">Why Pawket Change</h3>
+                <p class="mb-0">
+                    We focus on what matters most: attentive care, open communication, and fair prices.
+                    Whether you&rsquo;re balancing classes, work, or a busy week, our goal is to make caring for your dog a little easier.
+                </p>
+            </section>
+        </div>
+    </div>
+
+    <div class="mt-5">
+        <p class="lead tagline">Get to know us. We&rsquo;d love to get to know your dog.</p>
+        <a href="{% url 'services' %}" class="btn btn-pawket btn-lg m-1">Explore Our Services</a>
+        <a href="{% url 'contact' %}" class="btn btn-pawket btn-lg m-1">Contact Us</a>
+    </div>
+
+    <section class="mt-5">
+        <h2 class="page-title mb-4">Meet Our Team</h2>
+        <div class="row justify-content-center">
+            <div class="col-12 col-sm-8 col-md-5 col-lg-4">
+                <div class="team-card p-4 h-100">
+                    <img src="{% static 'founder.jpg' %}" alt="Hunter Freiner, founder of Pawket Change" class="team-photo mb-3">
+                    <h3 class="h4 service-name mb-1">Hunter Freiner</h3>
+                    <p class="team-role mb-0">Founder</p>
+                </div>
+            </div>
+        </div>
+    </section>
 </div>
 {% endblock %}

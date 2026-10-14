@@ -39,3 +39,8 @@ def services(request):
 def about(request):
     template = loader.get_template('about.html')
     return HttpResponse(template.render({}, request))
+
+
+def contact(request):
+    template = loader.get_template('contact.html')
+    return HttpResponse(template.render({}, request))
