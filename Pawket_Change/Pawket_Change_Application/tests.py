@@ -8,13 +8,13 @@ from .forms import BookingForm
 from .models import Booking
 
 
-def booking_data(check_in_offset=1, check_out_offset=3, pickup='10:00', drop_off='15:00'):
+def booking_data(check_in_offset=1, check_out_offset=3, drop_off='10:00', pickup='15:00'):
     today = timezone.localdate()
     return {
         'check_in_date': (today + timedelta(days=check_in_offset)).isoformat(),
         'check_out_date': (today + timedelta(days=check_out_offset)).isoformat(),
-        'pickup_time': pickup,
         'drop_off_time': drop_off,
+        'pickup_time': pickup,
     }
 
 
@@ -34,21 +34,21 @@ class BookingFormTests(TestCase):
         form = BookingForm(booking_data(check_out_offset=40))
         self.assertIn('check_out_date', form.errors)
 
-    def test_same_day_drop_off_before_pickup_is_invalid(self):
-        form = BookingForm(booking_data(check_out_offset=1, pickup='14:00', drop_off='11:00'))
-        self.assertIn('drop_off_time', form.errors)
+    def test_same_day_pickup_before_drop_off_is_invalid(self):
+        form = BookingForm(booking_data(check_out_offset=1, drop_off='14:00', pickup='11:00'))
+        self.assertIn('pickup_time', form.errors)
 
-    def test_same_day_drop_off_after_pickup_is_valid(self):
-        form = BookingForm(booking_data(check_out_offset=1, pickup='10:00', drop_off='16:00'))
+    def test_same_day_pickup_after_drop_off_is_valid(self):
+        form = BookingForm(booking_data(check_out_offset=1, drop_off='10:00', pickup='16:00'))
         self.assertTrue(form.is_valid())
 
     def test_times_outside_business_hours_are_invalid(self):
-        form = BookingForm(booking_data(pickup='07:30', drop_off='18:30'))
+        form = BookingForm(booking_data(drop_off='07:30', pickup='18:30'))
         self.assertIn('pickup_time', form.errors)
         self.assertIn('drop_off_time', form.errors)
 
     def test_opening_and_closing_times_are_valid(self):
-        self.assertTrue(BookingForm(booking_data(pickup='08:00', drop_off='18:00')).is_valid())
+        self.assertTrue(BookingForm(booking_data(drop_off='08:00', pickup='18:00')).is_valid())
 
 
 class BookingViewTests(TestCase):

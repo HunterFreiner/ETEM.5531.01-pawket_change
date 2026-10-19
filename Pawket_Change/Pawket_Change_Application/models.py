@@ -12,8 +12,8 @@ BUSINESS_HOURS = 'Monday–Sunday, 8:00 AM – 6:00 PM'
 class Booking(models.Model):
     check_in_date = models.DateField()
     check_out_date = models.DateField()
-    pickup_time = models.TimeField()
     drop_off_time = models.TimeField()
+    pickup_time = models.TimeField()
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

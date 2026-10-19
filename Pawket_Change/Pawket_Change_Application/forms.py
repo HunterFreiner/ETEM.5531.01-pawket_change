@@ -20,18 +20,18 @@ def time_slots():
 class BookingForm(forms.ModelForm):
     class Meta:
         model = Booking
-        fields = ['check_in_date', 'pickup_time', 'check_out_date', 'drop_off_time']
+        fields = ['check_in_date', 'drop_off_time', 'check_out_date', 'pickup_time']
         labels = {
-            'check_in_date': 'Check-in / pickup date',
-            'pickup_time': 'Pickup time',
-            'check_out_date': 'Check-out / drop-off date',
+            'check_in_date': 'Check-in / drop-off date',
             'drop_off_time': 'Drop-off time',
+            'check_out_date': 'Check-out / pickup date',
+            'pickup_time': 'Pickup time',
         }
         widgets = {
             'check_in_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'check_out_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
-            'pickup_time': forms.Select(choices=time_slots()),
             'drop_off_time': forms.Select(choices=time_slots()),
+            'pickup_time': forms.Select(choices=time_slots()),
         }
 
     def __init__(self, *args, **kwargs):
@@ -52,29 +52,29 @@ class BookingForm(forms.ModelForm):
             raise forms.ValidationError(f'Please choose a time during our business hours ({BUSINESS_HOURS}).')
         return value
 
-    def clean_pickup_time(self):
-        return self._clean_business_hours('pickup_time')
-
     def clean_drop_off_time(self):
         return self._clean_business_hours('drop_off_time')
+
+    def clean_pickup_time(self):
+        return self._clean_business_hours('pickup_time')
 
     def clean(self):
         cleaned_data = super().clean()
         check_in = cleaned_data.get('check_in_date')
         check_out = cleaned_data.get('check_out_date')
-        pickup = cleaned_data.get('pickup_time')
         drop_off = cleaned_data.get('drop_off_time')
+        pickup = cleaned_data.get('pickup_time')
 
         if check_in and check_out:
             if check_out < check_in:
                 self.add_error('check_out_date', 'Check-out date cannot be before the check-in date.')
             elif (check_out - check_in).days > MAX_STAY_NIGHTS:
                 self.add_error('check_out_date', f'Stays can be at most {MAX_STAY_NIGHTS} nights.')
-            elif check_out == check_in and pickup and drop_off and drop_off <= pickup:
-                self.add_error('drop_off_time', 'For a same-day stay, drop-off must be after pickup.')
+            elif check_out == check_in and drop_off and pickup and pickup <= drop_off:
+                self.add_error('pickup_time', 'For a same-day stay, pickup must be after drop-off.')
 
         now = timezone.localtime()
-        if check_in == now.date() and pickup and pickup <= now.time():
-            self.add_error('pickup_time', 'That pickup time has already passed today.')
+        if check_in == now.date() and drop_off and drop_off <= now.time():
+            self.add_error('drop_off_time', 'That drop-off time has already passed today.')
 
         return cleaned_data
