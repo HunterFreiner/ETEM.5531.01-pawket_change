@@ -1,10 +1,8 @@
-# Pawcket Change Branding Guidelines
-
-Status: Sprint 1 draft, pending team and Product Owner approval.
+# Pawket Change Branding Guidelines
 
 ## The name
 
-The business name is **Pawcket Change** (with the "c"). It's a play on "pocket change," and the pun only works with that spelling, so use it everywhere on the website, in the repo, and in marketing.
+The business name is **Pawket Change** (no "c" after "Paw"). It's a play on "pocket change." Use this spelling everywhere on the website, in the repo, and in marketing.
 
 Tagline: **Honest care, honest pricing.**
 
@@ -14,20 +12,12 @@ Budget-conscious dog owners like Dez Calloway, a college student who needs relia
 
 ## Logo
 
-The logo is a paw whose main pad is a coin with a cent sign. It says "affordable pet care" without a word.
-
-| File | Use it for |
-| --- | --- |
-| `pawcket-change-logo-stacked.svg` / `.png` | Hero sections, About Us, social profile images, print |
-| `pawcket-change-logo-horizontal.svg` / `.png` | The website header and footer |
-| `pawcket-change-icon.svg` / `.png` | Browser tab (favicon), app icons, small spaces |
+The logo is a paw whose main pad is a coin with a cent sign. 
 
 Rules:
 
-- Use the SVG on the website whenever possible. Use the PNG where SVG isn't supported. All files have transparent backgrounds.
 - The logo is designed for light backgrounds (white or cream). It doesn't have a dark-background version yet, so don't place it on dark colors.
 - Leave clear space around the logo equal to the height of the cent sign.
-- Minimum width: 120 px for the horizontal logo, 24 px for the icon.
 - Don't recolor, stretch, rotate, add shadows, or swap the font.
 
 ## Colors
