@@ -6,6 +6,7 @@ from django.db import models
 OPENING_TIME = time(8, 0)
 CLOSING_TIME = time(18, 0)
 MAX_STAY_NIGHTS = 30
+SLOT_MINUTES = 15
 BUSINESS_HOURS = 'Monday–Sunday, 8:00 AM – 6:00 PM'
 
 

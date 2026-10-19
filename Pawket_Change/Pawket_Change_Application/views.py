@@ -1,8 +1,9 @@
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponse
 from django.template import loader
+from django.utils import timezone
 
-from .forms import BookingForm
+from .forms import BookingForm, booked_slots
 from .models import Booking, BUSINESS_HOURS
 
 
@@ -60,7 +61,14 @@ def book(request):
             return render(request, 'booking_review.html', {'form': form, 'booking': form.instance})
     else:
         form = BookingForm()
-    return render(request, 'booking.html', {'form': form, 'business_hours': BUSINESS_HOURS})
+    now = timezone.localtime()
+    availability = {
+        'booked': booked_slots(),
+        'today': now.date().isoformat(),
+        'now': now.strftime('%H:%M'),
+    }
+    context = {'form': form, 'business_hours': BUSINESS_HOURS, 'availability': availability}
+    return render(request, 'booking.html', context)
 
 
 def booking_confirmation(request, booking_id):

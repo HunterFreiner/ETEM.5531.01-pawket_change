@@ -37,11 +37,41 @@
 {% endblock %}
 
 {% block scripts %}
+{{ availability|json_script:"availability" }}
 <script>
-    // Keep check-out from being earlier than check-in and show the length of stay as dates change.
+    // Keep check-out from being earlier than check-in, show the length of stay, and hide times that
+    // are already booked (or already passed) as the customer changes their selections.
     const checkIn = document.getElementById('{{ form.check_in_date.id_for_label }}');
     const checkOut = document.getElementById('{{ form.check_out_date.id_for_label }}');
+    const dropOff = document.getElementById('{{ form.drop_off_time.id_for_label }}');
+    const pickup = document.getElementById('{{ form.pickup_time.id_for_label }}');
     const stayLength = document.getElementById('stay-length');
+    const availability = JSON.parse(document.getElementById('availability').textContent);
+
+    function isBooked(date, time) {
+        return (availability.booked[date] || []).includes(time);
+    }
+
+    function updateTimeOptions(select, isUnavailable) {
+        for (const option of select.options) {
+            if (!option.value) {
+                continue;
+            }
+            const unavailable = isUnavailable(option.value);
+            option.disabled = unavailable;
+            option.hidden = unavailable;
+        }
+        if (select.selectedOptions[0] && select.selectedOptions[0].disabled) {
+            select.value = '';
+        }
+    }
+
+    function updateTimes() {
+        updateTimeOptions(dropOff, time =>
+            isBooked(checkIn.value, time) || (checkIn.value === availability.today && time <= availability.now));
+        updateTimeOptions(pickup, time =>
+            isBooked(checkOut.value, time) || (checkOut.value === checkIn.value && dropOff.value !== '' && time <= dropOff.value));
+    }
 
     function updateStay() {
         if (checkIn.value) {
@@ -61,8 +91,10 @@
         }
     }
 
-    checkIn.addEventListener('change', updateStay);
-    checkOut.addEventListener('change', updateStay);
+    checkIn.addEventListener('change', () => { updateStay(); updateTimes(); });
+    checkOut.addEventListener('change', () => { updateStay(); updateTimes(); });
+    dropOff.addEventListener('change', updateTimes);
     updateStay();
+    updateTimes();
 </script>
 {% endblock %}

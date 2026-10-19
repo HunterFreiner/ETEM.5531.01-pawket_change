@@ -1,20 +1,38 @@
+from collections import defaultdict
 from datetime import datetime, timedelta
 
 from django import forms
+from django.db.models import Q
 from django.utils import timezone
 
-from .models import Booking, BUSINESS_HOURS, CLOSING_TIME, MAX_STAY_NIGHTS, OPENING_TIME
+from .models import Booking, BUSINESS_HOURS, CLOSING_TIME, MAX_STAY_NIGHTS, OPENING_TIME, SLOT_MINUTES
 
 
 def time_slots():
-    """Every 30 minutes from opening to closing, e.g. ('08:00', '8:00 AM')."""
+    """Every 15 minutes from opening to closing, e.g. ('08:00', '8:00 AM')."""
     slots = [('', 'Select a time')]
     current = datetime.combine(datetime.today(), OPENING_TIME)
     closing = datetime.combine(datetime.today(), CLOSING_TIME)
     while current <= closing:
         slots.append((current.strftime('%H:%M'), current.strftime('%I:%M %p').lstrip('0')))
-        current += timedelta(minutes=30)
+        current += timedelta(minutes=SLOT_MINUTES)
     return slots
+
+
+def booked_slots():
+    """Drop-off and pickup times already taken on each upcoming date, e.g. {'2026-10-20': ['08:00', '14:15']}."""
+    slots = defaultdict(set)
+    for booking in Booking.objects.filter(check_out_date__gte=timezone.localdate()):
+        slots[booking.check_in_date.isoformat()].add(booking.drop_off_time.strftime('%H:%M'))
+        slots[booking.check_out_date.isoformat()].add(booking.pickup_time.strftime('%H:%M'))
+    return {day: sorted(times) for day, times in slots.items()}
+
+
+def slot_is_booked(day, time):
+    """Only one drop-off or pickup can happen in each time slot on a given day."""
+    return Booking.objects.filter(
+        Q(check_in_date=day, drop_off_time=time) | Q(check_out_date=day, pickup_time=time)
+    ).exists()
 
 
 class BookingForm(forms.ModelForm):
@@ -50,6 +68,8 @@ class BookingForm(forms.ModelForm):
         value = self.cleaned_data[field]
         if not OPENING_TIME <= value <= CLOSING_TIME:
             raise forms.ValidationError(f'Please choose a time during our business hours ({BUSINESS_HOURS}).')
+        if value.minute % SLOT_MINUTES or value.second:
+            raise forms.ValidationError(f'Please choose a time in {SLOT_MINUTES}-minute increments.')
         return value
 
     def clean_drop_off_time(self):
@@ -76,5 +96,10 @@ class BookingForm(forms.ModelForm):
         now = timezone.localtime()
         if check_in == now.date() and drop_off and drop_off <= now.time():
             self.add_error('drop_off_time', 'That drop-off time has already passed today.')
+
+        if check_in and drop_off and slot_is_booked(check_in, drop_off):
+            self.add_error('drop_off_time', 'That drop-off time is already booked on this date. Please choose another time.')
+        if check_out and pickup and slot_is_booked(check_out, pickup):
+            self.add_error('pickup_time', 'That pickup time is already booked on this date. Please choose another time.')
 
         return cleaned_data

@@ -4,7 +4,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import BookingForm
+from .forms import BookingForm, time_slots
 from .models import Booking
 
 
@@ -49,6 +49,38 @@ class BookingFormTests(TestCase):
 
     def test_opening_and_closing_times_are_valid(self):
         self.assertTrue(BookingForm(booking_data(drop_off='08:00', pickup='18:00')).is_valid())
+
+    def test_time_slots_are_15_minutes_apart(self):
+        values = [value for value, label in time_slots() if value]
+        self.assertEqual(values[:3], ['08:00', '08:15', '08:30'])
+        self.assertEqual(values[-1], '18:00')
+
+    def test_time_not_on_15_minute_slot_is_invalid(self):
+        form = BookingForm(booking_data(drop_off='08:10'))
+        self.assertIn('drop_off_time', form.errors)
+
+
+class BookedSlotTests(TestCase):
+    def setUp(self):
+        BookingForm(booking_data(drop_off='08:00', pickup='15:00')).save()
+
+    def test_booked_drop_off_time_is_unavailable(self):
+        form = BookingForm(booking_data(check_out_offset=5, drop_off='08:00', pickup='12:00'))
+        self.assertIn('drop_off_time', form.errors)
+
+    def test_booked_pickup_time_is_unavailable(self):
+        form = BookingForm(booking_data(check_in_offset=3, check_out_offset=4, drop_off='15:00', pickup='12:00'))
+        self.assertIn('drop_off_time', form.errors)
+
+    def test_booked_time_is_available_on_other_dates(self):
+        form = BookingForm(booking_data(check_in_offset=2, check_out_offset=4, drop_off='08:00', pickup='15:00'))
+        self.assertTrue(form.is_valid())
+
+    def test_booking_page_lists_booked_times(self):
+        response = self.client.get(reverse('book'))
+        booked = response.context['availability']['booked']
+        self.assertEqual(booked[booking_data()['check_in_date']], ['08:00'])
+        self.assertEqual(booked[booking_data()['check_out_date']], ['15:00'])
 
 
 class BookingViewTests(TestCase):
