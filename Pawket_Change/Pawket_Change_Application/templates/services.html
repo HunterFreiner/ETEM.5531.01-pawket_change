@@ -4,7 +4,7 @@
 
 {% block content %}
 <div class="container text-center">
-    <h2 class="page-title mb-3">Our Services</h2>
+    <h2 class="page-title mb-3">Our services</h2>
     <p class="lead tagline">Honest care, honest pricing &mdash; no memberships, no surprises.</p>
 
     <div class="row g-4 mt-2">
@@ -19,10 +19,12 @@
         {% endfor %}
     </div>
 
+    <a href="{% url 'book' %}" class="btn btn-pawket btn-lg mt-4">Book a Stay</a>
+
     <div class="row g-4 mt-4 text-start">
         <div class="col-12 col-lg-6">
             <section class="info-panel h-100 p-4">
-                <h3 class="page-title h4 mb-3">Optional Add-Ons</h3>
+                <h3 class="page-title h4 mb-3">Optional add-ons</h3>
                 <ul class="list-unstyled mb-3">
                     {% for add_on in add_ons %}
                     <li class="add-on d-flex justify-content-between py-2">
@@ -36,7 +38,7 @@
         </div>
         <div class="col-12 col-lg-6">
             <section class="info-panel h-100 p-4">
-                <h3 class="page-title h4 mb-3">Our Pricing Promise</h3>
+                <h3 class="page-title h4 mb-3">Our pricing promise</h3>
                 <ul class="promise-list mb-0">
                     {% for policy in policies %}
                     <li>{{ policy }}</li>

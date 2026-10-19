@@ -1,6 +1,10 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponse
 from django.template import loader
+from django.utils import timezone
+
+from .forms import BookingForm, booked_slots
+from .models import Booking, BUSINESS_HOURS, FULL_DAY_PRICE, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE, OVERNIGHT_PRICE
 
 
 def home(request):
@@ -10,9 +14,9 @@ def home(request):
 
 def services(request):
     service_list = [
-        {'name': 'Full-Day Daycare', 'price': '$25', 'unit': '/day', 'included': 'Supervised playtime, rest periods, and general care'},
-        {'name': 'Half-Day Daycare', 'price': '$15', 'unit': '/day', 'included': 'Up to 4 hours of supervised care'},
-        {'name': 'Overnight Boarding', 'price': '$45', 'unit': '/night', 'included': 'Overnight care, feeding, and daily activities'},
+        {'name': 'Full-Day Daycare', 'price': f'${FULL_DAY_PRICE}', 'unit': '/day', 'included': 'Supervised playtime, rest periods, and general care'},
+        {'name': 'Half-Day Daycare', 'price': f'${HALF_DAY_PRICE}', 'unit': '/day', 'included': f'Up to {HALF_DAY_MAX_HOURS} hours of supervised care'},
+        {'name': 'Overnight Boarding', 'price': f'${OVERNIGHT_PRICE}', 'unit': '/night', 'included': 'Overnight care, feeding, and daily activities'},
         {'name': 'Basic Grooming', 'price': '$30', 'unit': '', 'included': 'Bath, brushing, and basic cleaning'},
     ]
     add_ons = [
@@ -44,3 +48,29 @@ def about(request):
 def contact(request):
     template = loader.get_template('contact.html')
     return HttpResponse(template.render({}, request))
+
+
+def book(request):
+    if request.method == 'POST':
+        form = BookingForm(request.POST)
+        action = request.POST.get('action')
+        if form.is_valid() and action != 'edit':
+            if action == 'confirm':
+                booking = form.save()
+                return redirect('booking_confirmation', booking_id=booking.id)
+            return render(request, 'booking_review.html', {'form': form, 'booking': form.instance})
+    else:
+        form = BookingForm()
+    now = timezone.localtime()
+    availability = {
+        'booked': booked_slots(),
+        'today': now.date().isoformat(),
+        'now': now.strftime('%H:%M'),
+    }
+    context = {'form': form, 'business_hours': BUSINESS_HOURS, 'availability': availability}
+    return render(request, 'booking.html', context)
+
+
+def booking_confirmation(request, booking_id):
+    booking = get_object_or_404(Booking, id=booking_id)
+    return render(request, 'booking_confirmation.html', {'booking': booking})

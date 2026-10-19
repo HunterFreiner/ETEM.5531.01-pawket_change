@@ -6,6 +6,10 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <title>{% block title %}Pawket Change{% endblock %}</title>
+        <link rel="icon" type="image/png" href="{% static 'pawket_icon.png' %}">
+        <link rel="preconnect" href="https://fonts.googleapis.com">
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;800&family=Inter:wght@400;500&display=swap">
         {% bootstrap_css %}
         {% bootstrap_javascript %}
         <link rel="stylesheet" href="{% static 'styles.css' %}"/>
@@ -29,6 +33,9 @@
                             <a class="nav-link {% if request.resolver_match.url_name == 'services' %}active{% endif %}" href="{% url 'services' %}">Services</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'book' %}active{% endif %}" href="{% url 'book' %}">Book a Stay</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'about' %}active{% endif %}" href="{% url 'about' %}">About Us</a>
                         </li>
                         <li class="nav-item">
@@ -44,8 +51,11 @@
         </main>
 
         <footer class="site-footer text-white text-center py-3">
+            <p class="mb-1">Open Monday&ndash;Sunday, 8:00 AM &ndash; 6:00 PM</p>
             &copy; Pawket Change
         </footer>
+
+        {% block scripts %}{% endblock %}
 
     </body>
 </html>

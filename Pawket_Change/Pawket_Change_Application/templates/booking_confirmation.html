@@ -1,0 +1,21 @@
+{% extends 'base.html' %}
+
+{% block title %}Booking Requested | Pawket Change{% endblock %}
+
+{% block content %}
+<div class="container text-center">
+    <h2 class="page-title mb-3">Booking request received!</h2>
+    <p class="lead tagline">Thank you &mdash; we can&rsquo;t wait to see your pet.</p>
+
+    <section class="mission mx-auto mt-4 p-4">
+        <p class="mb-0">
+            Your stay from <strong>{{ booking.check_in_date|date:"F j, Y" }}</strong> at <strong>{{ booking.drop_off_time|time:"g:i A" }}</strong>
+            to <strong>{{ booking.check_out_date|date:"F j, Y" }}</strong> at <strong>{{ booking.pickup_time|time:"g:i A" }}</strong>
+            ({{ booking.length_of_stay|lower }}) has been received.
+            The cost for the stay will be <strong>${{ booking.cost }}</strong>.
+        </p>
+    </section>
+
+    <a href="{% url 'home' %}" class="btn btn-pawket btn-lg mt-4">Back to Home</a>
+</div>
+{% endblock %}
