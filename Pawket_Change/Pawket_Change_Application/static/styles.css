@@ -152,3 +152,20 @@ body {
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
+
+.booking-panel {
+    max-width: 800px;
+}
+
+.stay-length {
+    color: var(--pawket-bronze);
+    font-weight: 600;
+}
+
+.booking-summary dt {
+    color: var(--pawket-teal);
+}
+
+.booking-summary > div + div {
+    border-top: 1px solid #e6dfcf;
+}

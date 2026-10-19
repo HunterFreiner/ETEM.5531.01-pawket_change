@@ -29,6 +29,9 @@
                             <a class="nav-link {% if request.resolver_match.url_name == 'services' %}active{% endif %}" href="{% url 'services' %}">Services</a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'book' %}active{% endif %}" href="{% url 'book' %}">Book a Stay</a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {% if request.resolver_match.url_name == 'about' %}active{% endif %}" href="{% url 'about' %}">About Us</a>
                         </li>
                         <li class="nav-item">
@@ -44,8 +47,11 @@
         </main>
 
         <footer class="site-footer text-white text-center py-3">
+            <p class="mb-1">Open Monday&ndash;Sunday, 8:00 AM &ndash; 6:00 PM</p>
             &copy; Pawket Change
         </footer>
+
+        {% block scripts %}{% endblock %}
 
     </body>
 </html>

@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% load django_bootstrap5 %}
+
+{% block title %}Book a Stay | Pawket Change{% endblock %}
+
+{% block content %}
+<div class="container text-center">
+    <h2 class="page-title mb-3">Book a Stay</h2>
+    <p class="lead tagline">Pick your dates and times &mdash; we&rsquo;re open {{ business_hours }}.</p>
+
+    <section class="info-panel booking-panel mx-auto mt-4 p-4 text-start">
+        <form method="post" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors|join:" " }}</div>
+            {% endif %}
+
+            <div class="row g-4">
+                <div class="col-12 col-md-6">
+                    <h3 class="page-title h5 mb-3">Check-In</h3>
+                    {% bootstrap_field form.check_in_date %}
+                    {% bootstrap_field form.pickup_time %}
+                </div>
+                <div class="col-12 col-md-6">
+                    <h3 class="page-title h5 mb-3">Check-Out</h3>
+                    {% bootstrap_field form.check_out_date %}
+                    {% bootstrap_field form.drop_off_time %}
+                </div>
+            </div>
+
+            <p class="stay-length mt-2 mb-4">Length of stay: <span id="stay-length">Select your dates</span></p>
+
+            <button type="submit" name="action" value="review" class="btn btn-pawket btn-lg">Review Booking</button>
+        </form>
+    </section>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    // Keep check-out from being earlier than check-in and show the length of stay as dates change.
+    const checkIn = document.getElementById('{{ form.check_in_date.id_for_label }}');
+    const checkOut = document.getElementById('{{ form.check_out_date.id_for_label }}');
+    const stayLength = document.getElementById('stay-length');
+
+    function updateStay() {
+        if (checkIn.value) {
+            checkOut.min = checkIn.value;
+        }
+        if (!checkIn.value || !checkOut.value) {
+            stayLength.textContent = 'Select your dates';
+            return;
+        }
+        const nights = Math.round((new Date(checkOut.value) - new Date(checkIn.value)) / 86400000);
+        if (nights < 0) {
+            stayLength.textContent = 'Check-out must be on or after check-in';
+        } else if (nights === 0) {
+            stayLength.textContent = 'Same-day stay';
+        } else {
+            stayLength.textContent = nights + (nights === 1 ? ' night' : ' nights');
+        }
+    }
+
+    checkIn.addEventListener('change', updateStay);
+    checkOut.addEventListener('change', updateStay);
+    updateStay();
+</script>
+{% endblock %}

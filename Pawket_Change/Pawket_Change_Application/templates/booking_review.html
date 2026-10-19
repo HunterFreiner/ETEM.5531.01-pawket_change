@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block title %}Review Booking | Pawket Change{% endblock %}
+
+{% block content %}
+<div class="container text-center">
+    <h2 class="page-title mb-3">Review Your Booking</h2>
+    <p class="lead tagline">Please check your details before submitting.</p>
+
+    <section class="info-panel booking-panel mx-auto mt-4 p-4 text-start">
+        <dl class="booking-summary mb-4">
+            <div class="d-flex justify-content-between py-2">
+                <dt>Check-in / pickup date</dt>
+                <dd class="mb-0">{{ booking.check_in_date|date:"l, F j, Y" }}</dd>
+            </div>
+            <div class="d-flex justify-content-between py-2">
+                <dt>Pickup time</dt>
+                <dd class="mb-0">{{ booking.pickup_time|time:"g:i A" }}</dd>
+            </div>
+            <div class="d-flex justify-content-between py-2">
+                <dt>Check-out / drop-off date</dt>
+                <dd class="mb-0">{{ booking.check_out_date|date:"l, F j, Y" }}</dd>
+            </div>
+            <div class="d-flex justify-content-between py-2">
+                <dt>Drop-off time</dt>
+                <dd class="mb-0">{{ booking.drop_off_time|time:"g:i A" }}</dd>
+            </div>
+            <div class="d-flex justify-content-between py-2">
+                <dt>Length of stay</dt>
+                <dd class="mb-0">{{ booking.length_of_stay }}</dd>
+            </div>
+        </dl>
+
+        <form method="post" action="{% url 'book' %}" class="d-flex gap-3 justify-content-end">
+            {% csrf_token %}
+            {% for field in form %}{{ field.as_hidden }}{% endfor %}
+            <button type="submit" name="action" value="edit" class="btn btn-outline-secondary btn-lg">Edit</button>
+            <button type="submit" name="action" value="confirm" class="btn btn-pawket btn-lg">Submit Booking</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

@@ -1,6 +1,9 @@
-from django.shortcuts import render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponse
 from django.template import loader
+
+from .forms import BookingForm
+from .models import Booking, BUSINESS_HOURS
 
 
 def home(request):
@@ -44,3 +47,22 @@ def about(request):
 def contact(request):
     template = loader.get_template('contact.html')
     return HttpResponse(template.render({}, request))
+
+
+def book(request):
+    if request.method == 'POST':
+        form = BookingForm(request.POST)
+        action = request.POST.get('action')
+        if form.is_valid() and action != 'edit':
+            if action == 'confirm':
+                booking = form.save()
+                return redirect('booking_confirmation', booking_id=booking.id)
+            return render(request, 'booking_review.html', {'form': form, 'booking': form.instance})
+    else:
+        form = BookingForm()
+    return render(request, 'booking.html', {'form': form, 'business_hours': BUSINESS_HOURS})
+
+
+def booking_confirmation(request, booking_id):
+    booking = get_object_or_404(Booking, id=booking_id)
+    return render(request, 'booking_confirmation.html', {'booking': booking})
