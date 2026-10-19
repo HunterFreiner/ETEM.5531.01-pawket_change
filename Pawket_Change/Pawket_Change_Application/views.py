@@ -4,7 +4,7 @@ from django.template import loader
 from django.utils import timezone
 
 from .forms import BookingForm, booked_slots
-from .models import Booking, BUSINESS_HOURS
+from .models import Booking, BUSINESS_HOURS, FULL_DAY_PRICE, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE, OVERNIGHT_PRICE
 
 
 def home(request):
@@ -14,9 +14,9 @@ def home(request):
 
 def services(request):
     service_list = [
-        {'name': 'Full-Day Daycare', 'price': '$25', 'unit': '/day', 'included': 'Supervised playtime, rest periods, and general care'},
-        {'name': 'Half-Day Daycare', 'price': '$15', 'unit': '/day', 'included': 'Up to 4 hours of supervised care'},
-        {'name': 'Overnight Boarding', 'price': '$45', 'unit': '/night', 'included': 'Overnight care, feeding, and daily activities'},
+        {'name': 'Full-Day Daycare', 'price': f'${FULL_DAY_PRICE}', 'unit': '/day', 'included': 'Supervised playtime, rest periods, and general care'},
+        {'name': 'Half-Day Daycare', 'price': f'${HALF_DAY_PRICE}', 'unit': '/day', 'included': f'Up to {HALF_DAY_MAX_HOURS} hours of supervised care'},
+        {'name': 'Overnight Boarding', 'price': f'${OVERNIGHT_PRICE}', 'unit': '/night', 'included': 'Overnight care, feeding, and daily activities'},
         {'name': 'Basic Grooming', 'price': '$30', 'unit': '', 'included': 'Bath, brushing, and basic cleaning'},
     ]
     add_ons = [

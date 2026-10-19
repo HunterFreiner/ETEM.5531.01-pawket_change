@@ -11,7 +11,8 @@
         <p class="mb-0">
             Your stay from <strong>{{ booking.check_in_date|date:"F j, Y" }}</strong> at <strong>{{ booking.drop_off_time|time:"g:i A" }}</strong>
             to <strong>{{ booking.check_out_date|date:"F j, Y" }}</strong> at <strong>{{ booking.pickup_time|time:"g:i A" }}</strong>
-            ({{ booking.length_of_stay|lower }}) has been requested.
+            ({{ booking.length_of_stay|lower }}) has been received.
+            The cost for the stay will be <strong>${{ booking.cost }}</strong>.
         </p>
     </section>
 

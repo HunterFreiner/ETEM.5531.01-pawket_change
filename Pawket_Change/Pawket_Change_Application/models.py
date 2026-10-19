@@ -1,4 +1,4 @@
-from datetime import time
+from datetime import datetime, time, timedelta
 
 from django.db import models
 
@@ -7,6 +7,12 @@ OPENING_TIME = time(8, 0)
 CLOSING_TIME = time(18, 0)
 MAX_STAY_NIGHTS = 30
 SLOT_MINUTES = 15
+
+# Prices shown on the Services page and used to calculate the cost of a stay.
+FULL_DAY_PRICE = 25
+HALF_DAY_PRICE = 15
+HALF_DAY_MAX_HOURS = 4
+OVERNIGHT_PRICE = 45
 BUSINESS_HOURS = 'Monday–Sunday, 8:00 AM – 6:00 PM'
 
 
@@ -32,3 +38,14 @@ class Booking(models.Model):
         if self.nights == 0:
             return 'Same-day stay'
         return f'{self.nights} night{"s" if self.nights != 1 else ""}'
+
+    @property
+    def cost(self):
+        """Overnight stays are charged per night; same-day stays are half-day or full-day daycare."""
+        if self.nights > 0:
+            return self.nights * OVERNIGHT_PRICE
+        drop_off = datetime.combine(self.check_in_date, self.drop_off_time)
+        pickup = datetime.combine(self.check_out_date, self.pickup_time)
+        if pickup - drop_off <= timedelta(hours=HALF_DAY_MAX_HOURS):
+            return HALF_DAY_PRICE
+        return FULL_DAY_PRICE

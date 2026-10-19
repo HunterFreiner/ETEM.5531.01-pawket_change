@@ -111,3 +111,29 @@ class BookingViewTests(TestCase):
         response = self.client.post(reverse('book'), {**booking_data(), 'action': 'confirm'})
         booking = Booking.objects.get()
         self.assertRedirects(response, reverse('booking_confirmation', args=[booking.id]))
+
+    def test_confirmation_shows_received_and_cost(self):
+        self.client.post(reverse('book'), {**booking_data(), 'action': 'confirm'})
+        response = self.client.get(reverse('booking_confirmation', args=[Booking.objects.get().id]))
+        self.assertContains(response, 'has been received')
+        self.assertContains(response, 'The cost for the stay will be <strong>$90</strong>')
+
+    def test_review_shows_cost(self):
+        response = self.client.post(reverse('book'), {**booking_data(), 'action': 'review'})
+        self.assertContains(response, '$90')
+
+
+class BookingCostTests(TestCase):
+    def cost(self, **kwargs):
+        form = BookingForm(booking_data(**kwargs))
+        self.assertTrue(form.is_valid(), form.errors)
+        return form.instance.cost
+
+    def test_overnight_stay_is_charged_per_night(self):
+        self.assertEqual(self.cost(check_out_offset=4), 3 * 45)
+
+    def test_same_day_up_to_four_hours_is_half_day(self):
+        self.assertEqual(self.cost(check_out_offset=1, drop_off='08:00', pickup='12:00'), 15)
+
+    def test_same_day_over_four_hours_is_full_day(self):
+        self.assertEqual(self.cost(check_out_offset=1, drop_off='08:00', pickup='12:15'), 25)
