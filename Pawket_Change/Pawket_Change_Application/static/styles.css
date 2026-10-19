@@ -1,43 +1,65 @@
-/* Colors pulled from the Pawket Change logo */
+/* Colors and fonts from BRANDING.md */
 :root {
-    --pawket-teal: #375e62;
-    --pawket-dark-teal: #20373a;
-    --pawket-gold: #bc974e;
-    --pawket-bronze: #927237;
-    --pawket-cream: #faf7f0;
+    --teal: #1E5F63;
+    --gold: #C8963E;
+    --ink: #12383B;
+    --cream: #FBF6EC;
+    --charcoal: #2B2B2B;
+    --white: #FFFFFF;
+    --rule: #e6dfcf;
+
+    --font-heading: "Fraunces", Georgia, "Times New Roman", serif;
+    --font-body: "Inter", system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+
+    --bs-body-font-family: var(--font-body);
 }
 
 body {
-    font-family: 'Arial', sans-serif;
-    background-color: var(--pawket-cream);
-    color: var(--pawket-dark-teal);
+    font-family: var(--font-body);
+    font-weight: 400;
+    background-color: var(--cream);
+    color: var(--charcoal);
+}
+
+h1, h2, h3, h4, h5, h6,
+.h1, .h2, .h3, .h4, .h5, .h6 {
+    font-family: var(--font-heading);
+    font-weight: 700;
+}
+
+/* Inter is loaded at 400 and 500 only, so bold body text uses 500. */
+strong,
+b,
+.fw-bold {
+    font-weight: 500 !important;
 }
 
 .site-header {
-    background-color: var(--pawket-teal);
-    border-bottom: 4px solid var(--pawket-gold);
+    background-color: var(--teal);
+    border-bottom: 4px solid var(--gold);
 }
 
 .site-header .nav-link {
-    color: #ffffff;
+    color: var(--white);
+    font-weight: 500;
     border-bottom: 2px solid transparent;
 }
 
 .site-header .nav-link:hover,
 .site-header .nav-link.active {
-    color: #ffffff;
-    border-bottom-color: var(--pawket-gold);
+    color: var(--white);
+    border-bottom-color: var(--gold);
 }
 
 .site-footer {
-    background-color: var(--pawket-dark-teal);
-    border-top: 4px solid var(--pawket-gold);
+    background-color: var(--ink);
+    border-top: 4px solid var(--gold);
 }
 
 .header-icon {
     width: 60px;
-    background-color: #ffffff;
-    border: 2px solid var(--pawket-gold);
+    background-color: var(--white);
+    border: 2px solid var(--gold);
     border-radius: 0.5rem;
     padding: 4px;
 }
@@ -48,27 +70,28 @@ body {
 }
 
 .tagline {
-    color: var(--pawket-teal);
-    font-weight: 600;
+    color: var(--teal);
+    font-weight: 500;
 }
 
 .dog-photo {
     width: 100%;
     aspect-ratio: 4 / 3;
     object-fit: cover;
-    border: 3px solid var(--pawket-gold);
+    border: 3px solid var(--gold);
     border-radius: 0.75rem;
 }
 
 .page-title {
-    color: var(--pawket-dark-teal);
-    font-weight: 700;
+    color: var(--teal);
+    font-weight: 800;
 }
 
 .mission {
-    max-width: 800px;
-    background-color: #ffffff;
-    border-left: 6px solid var(--pawket-gold);
+    /* Keeps body lines under about 75 characters. */
+    max-width: 42rem;
+    background-color: var(--white);
+    border-left: 6px solid var(--gold);
     border-radius: 0.75rem;
     font-size: 1.1rem;
     line-height: 1.7;
@@ -76,42 +99,44 @@ body {
 }
 
 .price-card {
-    background-color: #ffffff;
-    border-top: 6px solid var(--pawket-teal);
+    background-color: var(--white);
+    border-top: 6px solid var(--teal);
     border-radius: 0.75rem;
-    box-shadow: 0 2px 8px rgba(32, 55, 58, 0.1);
+    box-shadow: 0 2px 8px rgba(18, 56, 59, 0.1);
 }
 
 .service-name {
-    color: var(--pawket-teal);
+    color: var(--teal);
     font-weight: 700;
 }
 
 .price {
+    font-family: var(--font-heading);
     font-size: 2.5rem;
-    font-weight: 700;
-    color: var(--pawket-dark-teal);
+    font-weight: 800;
+    color: var(--ink);
     line-height: 1.1;
 }
 
 .price-unit {
+    font-family: var(--font-body);
     font-size: 1rem;
     font-weight: 400;
-    color: var(--pawket-bronze);
+    color: var(--teal);
 }
 
 .info-panel {
-    background-color: #ffffff;
-    border-left: 6px solid var(--pawket-gold);
+    background-color: var(--white);
+    border-left: 6px solid var(--gold);
     border-radius: 0.75rem;
 }
 
 .add-on + .add-on {
-    border-top: 1px solid #e6dfcf;
+    border-top: 1px solid var(--rule);
 }
 
 .promise-list li::marker {
-    color: var(--pawket-gold);
+    color: var(--gold);
 }
 
 .promise-list li + li {
@@ -119,36 +144,37 @@ body {
 }
 
 .btn-pawket {
-    background-color: var(--pawket-teal);
-    border: 2px solid var(--pawket-gold);
-    color: #ffffff;
+    background-color: var(--teal);
+    border: 2px solid var(--gold);
+    color: var(--white);
+    font-weight: 500;
 }
 
 .btn-pawket:hover,
 .btn-pawket:focus {
-    background-color: var(--pawket-dark-teal);
-    border-color: var(--pawket-gold);
-    color: #ffffff;
+    background-color: var(--ink);
+    border-color: var(--gold);
+    color: var(--white);
 }
 
 .team-card {
-    background-color: #ffffff;
-    border-top: 6px solid var(--pawket-teal);
+    background-color: var(--white);
+    border-top: 6px solid var(--teal);
     border-radius: 0.75rem;
-    box-shadow: 0 2px 8px rgba(32, 55, 58, 0.1);
+    box-shadow: 0 2px 8px rgba(18, 56, 59, 0.1);
 }
 
 .team-photo {
     width: 180px;
     height: 180px;
     object-fit: cover;
-    border: 4px solid var(--pawket-gold);
+    border: 4px solid var(--gold);
     border-radius: 50%;
 }
 
 .team-role {
-    color: var(--pawket-bronze);
-    font-weight: 600;
+    color: var(--teal);
+    font-weight: 500;
     text-transform: uppercase;
     letter-spacing: 0.05em;
 }
@@ -158,14 +184,15 @@ body {
 }
 
 .stay-length {
-    color: var(--pawket-bronze);
-    font-weight: 600;
+    color: var(--teal);
+    font-weight: 500;
 }
 
 .booking-summary dt {
-    color: var(--pawket-teal);
+    color: var(--teal);
+    font-weight: 500;
 }
 
 .booking-summary > div + div {
-    border-top: 1px solid #e6dfcf;
+    border-top: 1px solid var(--rule);
 }
