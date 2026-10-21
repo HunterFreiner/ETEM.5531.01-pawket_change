@@ -1,10 +1,18 @@
+import logging
+
+from django.conf import settings
+from django.contrib import messages
+from django.db import DatabaseError
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponse
 from django.template import loader
 from django.utils import timezone
 
-from .forms import BookingForm, booked_slots
+from .forms import BookingForm, ContactForm, booked_slots
 from .models import Booking, BUSINESS_HOURS, FULL_DAY_PRICE, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE, OVERNIGHT_PRICE
+
+
+logger = logging.getLogger(__name__)
 
 
 def home(request):
@@ -46,8 +54,28 @@ def about(request):
 
 
 def contact(request):
-    template = loader.get_template('contact.html')
-    return HttpResponse(template.render({}, request))
+    form = ContactForm(request.POST or None)
+    if request.method == 'POST' and form.is_valid():
+        try:
+            form.save()
+        except DatabaseError:
+            logger.exception('Unable to save a contact message.')
+            form.add_error(None, 'We could not send your message right now. Please try again later.')
+        else:
+            messages.success(
+                request,
+                'Thanks for reaching out. We received your message and will get back to you as soon as we can.',
+            )
+            return redirect('contact')
+
+    context = {
+        'form': form,
+        'business_hours': BUSINESS_HOURS,
+        'contact_phone': settings.CONTACT_PHONE,
+        'contact_email': settings.CONTACT_EMAIL,
+        'contact_address': settings.CONTACT_ADDRESS,
+    }
+    return render(request, 'contact.html', context)
 
 
 def book(request):

@@ -5,7 +5,7 @@ from django import forms
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Booking, BUSINESS_HOURS, CLOSING_TIME, MAX_STAY_NIGHTS, OPENING_TIME, SLOT_MINUTES
+from .models import Booking, BUSINESS_HOURS, CLOSING_TIME, ContactMessage, MAX_STAY_NIGHTS, OPENING_TIME, SLOT_MINUTES
 
 
 def time_slots():
@@ -103,3 +103,41 @@ class BookingForm(forms.ModelForm):
             self.add_error('pickup_time', 'That pickup time is already booked on this date. Please choose another time.')
 
         return cleaned_data
+
+
+class ContactForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.is_bound:
+            for field_name in self.errors:
+                if field_name in self.fields:
+                    self.fields[field_name].widget.attrs.update({
+                        'aria-invalid': 'true',
+                        'aria-describedby': f'id_{field_name}-error',
+                    })
+
+    class Meta:
+        model = ContactMessage
+        fields = ['name', 'email', 'message']
+        labels = {
+            'name': 'Name',
+            'email': 'Email address',
+            'message': 'How can we help?',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'autocomplete': 'name',
+                'class': 'form-control',
+                'placeholder': 'Your name',
+            }),
+            'email': forms.EmailInput(attrs={
+                'autocomplete': 'email',
+                'class': 'form-control',
+                'placeholder': 'you@example.com',
+            }),
+            'message': forms.Textarea(attrs={
+                'class': 'form-control',
+                'placeholder': 'Tell us what you need help with',
+                'rows': 6,
+            }),
+        }

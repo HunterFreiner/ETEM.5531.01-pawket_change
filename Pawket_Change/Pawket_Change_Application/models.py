@@ -49,3 +49,16 @@ class Booking(models.Model):
         if pickup - drop_off <= timedelta(hours=HALF_DAY_MAX_HOURS):
             return HALF_DAY_PRICE
         return FULL_DAY_PRICE
+
+
+class ContactMessage(models.Model):
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    message = models.TextField(max_length=2000)
+    submitted_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-submitted_at']
+
+    def __str__(self):
+        return f'Message from {self.name} ({self.email})'

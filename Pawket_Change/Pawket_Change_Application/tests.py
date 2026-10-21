@@ -1,11 +1,14 @@
 from datetime import timedelta
+from unittest.mock import patch
 
+from django.db import DatabaseError
 from django.test import TestCase
+from django.test.utils import override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .forms import BookingForm, time_slots
-from .models import Booking
+from .forms import BookingForm, ContactForm, time_slots
+from .models import Booking, ContactMessage
 
 
 def booking_data(check_in_offset=1, check_out_offset=3, drop_off='10:00', pickup='15:00'):
@@ -137,3 +140,79 @@ class BookingCostTests(TestCase):
 
     def test_same_day_over_four_hours_is_full_day(self):
         self.assertEqual(self.cost(check_out_offset=1, drop_off='08:00', pickup='12:15'), 25)
+
+
+class ContactFormTests(TestCase):
+    def test_valid_contact_message(self):
+        form = ContactForm({
+            'name': 'Dez Calloway',
+            'email': 'dez@example.com',
+            'message': 'Can you tell me whether next Saturday is available?',
+        })
+        self.assertTrue(form.is_valid(), form.errors)
+
+    def test_invalid_email_is_rejected(self):
+        form = ContactForm({
+            'name': 'Dez Calloway',
+            'email': 'not-an-email',
+            'message': 'I have a question.',
+        })
+        self.assertIn('email', form.errors)
+
+    def test_all_fields_are_required(self):
+        form = ContactForm({})
+        self.assertEqual(set(form.errors), {'name', 'email', 'message'})
+
+
+class ContactViewTests(TestCase):
+    def valid_message(self):
+        return {
+            'name': 'Dez Calloway',
+            'email': 'dez@example.com',
+            'message': 'Can you tell me whether next Saturday is available?',
+        }
+
+    def test_contact_page_loads_with_confirmed_hours_and_clear_placeholders(self):
+        response = self.client.get(reverse('contact'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Monday–Sunday, 8:00 AM – 6:00 PM')
+        self.assertContains(response, 'Not published yet', count=3)
+        self.assertContains(response, 'All fields are required.')
+
+    @override_settings(
+        CONTACT_PHONE='(555) 010-0200',
+        CONTACT_EMAIL='hello@example.com',
+        CONTACT_ADDRESS='123 Example Street',
+    )
+    def test_confirmed_contact_details_are_displayed(self):
+        response = self.client.get(reverse('contact'))
+        self.assertContains(response, '(555) 010-0200')
+        self.assertContains(response, 'hello@example.com')
+        self.assertContains(response, '123 Example Street')
+        self.assertNotContains(response, 'Not published yet')
+
+    def test_valid_submission_is_saved_before_success_is_shown(self):
+        response = self.client.post(reverse('contact'), self.valid_message(), follow=True)
+        self.assertRedirects(response, reverse('contact'))
+        self.assertEqual(ContactMessage.objects.count(), 1)
+        self.assertContains(response, 'We received your message')
+
+    def test_invalid_submission_is_not_saved(self):
+        data = {**self.valid_message(), 'email': 'not-an-email'}
+        response = self.client.post(reverse('contact'), data)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ContactMessage.objects.count(), 0)
+        self.assertContains(response, 'Enter a valid email address')
+        self.assertNotContains(response, 'We received your message')
+
+    @patch('Pawket_Change_Application.views.ContactForm.save', side_effect=DatabaseError)
+    def test_save_failure_shows_error_without_success(self, mocked_save):
+        response = self.client.post(reverse('contact'), self.valid_message())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(ContactMessage.objects.count(), 0)
+        self.assertContains(response, 'We could not send your message right now')
+        self.assertNotContains(response, 'We received your message')
+
+    def test_home_and_navigation_link_to_contact_page(self):
+        response = self.client.get(reverse('home'))
+        self.assertContains(response, f'href="{reverse("contact")}"', count=2)
