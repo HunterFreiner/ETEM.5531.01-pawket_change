@@ -1,0 +1,66 @@
+
+{% extends 'base.html' %}
+
+{% block title %}Customer Reviews | Pawket Change{% endblock %}
+
+{% block content %}
+<div class="container">
+
+    <div class="text-center mb-5">
+        <h2>What Our Customers Say</h2>
+        <p class="lead">
+            Hear from pet owners who have trusted
+            Pawket Change with their pets.
+        </p>
+    </div>
+
+    <div class="row g-4">
+        {% for review in testimonials %}
+        <div class="col-md-6 col-lg-4">
+            <div class="card h-100 shadow-sm">
+                <div class="card-body">
+
+                    {% if review.rating %}
+                    <div class="mb-3 text-warning"
+                         aria-label="{{ review.rating }} out of 5 stars">
+                        {% with stars="12345" %}
+                            {% for star in stars %}
+                                {% if forloop.counter <= review.rating %}
+                                    &#9733;
+                                {% else %}
+                                    &#9734;
+                                {% endif %}
+                            {% endfor %}
+                        {% endwith %}
+                    </div>
+                    {% endif %}
+
+                    <p class="card-text">
+                        "{{ review.review_text }}"
+                    </p>
+
+                    <h5 class="card-title mb-1">
+                        {{ review.customer_name }}
+                    </h5>
+
+                    {% if review.pet_name %}
+                    <p class="text-muted mb-0">
+                        Pet owner of {{ review.pet_name }}
+                    </p>
+                    {% endif %}
+
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12 text-center">
+            <p class="text-muted">
+                No customer reviews have been published yet.
+                Check back soon!
+            </p>
+        </div>
+        {% endfor %}
+    </div>
+
+</div>
+{% endblock %}
