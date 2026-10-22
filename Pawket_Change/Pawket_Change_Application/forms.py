@@ -5,7 +5,7 @@ from django import forms
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Booking, BUSINESS_HOURS, CLOSING_TIME, MAX_STAY_NIGHTS, OPENING_TIME, SLOT_MINUTES
+from .models import Booking, BUSINESS_HOURS, CLOSING_TIME, ContactMessage, MAX_STAY_NIGHTS, OPENING_TIME, Review, SLOT_MINUTES
 
 
 def time_slots():
@@ -38,14 +38,19 @@ def slot_is_booked(day, time):
 class BookingForm(forms.ModelForm):
     class Meta:
         model = Booking
-        fields = ['check_in_date', 'drop_off_time', 'check_out_date', 'pickup_time']
+        fields = ['email', 'check_in_date', 'drop_off_time', 'check_out_date', 'pickup_time']
         labels = {
+            'email': 'Email address',
             'check_in_date': 'Check-in / drop-off date',
             'drop_off_time': 'Drop-off time',
             'check_out_date': 'Check-out / pickup date',
             'pickup_time': 'Pickup time',
         }
+        help_texts = {
+            'email': 'Use this email later to leave a review of your stay.',
+        }
         widgets = {
+            'email': forms.EmailInput(attrs={'autocomplete': 'email', 'placeholder': 'you@example.com'}),
             'check_in_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'check_out_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
             'drop_off_time': forms.Select(choices=time_slots()),
@@ -103,3 +108,73 @@ class BookingForm(forms.ModelForm):
             self.add_error('pickup_time', 'That pickup time is already booked on this date. Please choose another time.')
 
         return cleaned_data
+
+
+class ContactForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.is_bound:
+            for field_name in self.errors:
+                if field_name in self.fields:
+                    self.fields[field_name].widget.attrs.update({
+                        'aria-invalid': 'true',
+                        'aria-describedby': f'id_{field_name}-error',
+                    })
+
+    class Meta:
+        model = ContactMessage
+        fields = ['name', 'email', 'message']
+        labels = {
+            'name': 'Name',
+            'email': 'Email address',
+            'message': 'How can we help?',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={
+                'autocomplete': 'name',
+                'class': 'form-control',
+                'placeholder': 'Your name',
+            }),
+            'email': forms.EmailInput(attrs={
+                'autocomplete': 'email',
+                'class': 'form-control',
+                'placeholder': 'you@example.com',
+            }),
+            'message': forms.Textarea(attrs={
+                'class': 'form-control',
+                'placeholder': 'Tell us what you need help with',
+                'rows': 6,
+            }),
+        }
+
+
+class ReviewEmailForm(forms.Form):
+    email = forms.EmailField(
+        label='Email used for your booking',
+        # No autocomplete, so the browser does not suggest other people's emails on a shared device.
+        widget=forms.EmailInput(attrs={'autocomplete': 'off', 'placeholder': 'you@example.com'}),
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data['email']
+        if not Booking.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError(
+                'We could not find a booking with that email. Only guests who have booked a stay can leave a review.'
+            )
+        return email
+
+
+class ReviewForm(forms.ModelForm):
+    class Meta:
+        model = Review
+        fields = ['name', 'rating', 'comment']
+        labels = {
+            'name': 'Name shown with your review',
+            'rating': 'Rating',
+            'comment': 'Your review',
+        }
+        widgets = {
+            'name': forms.TextInput(attrs={'autocomplete': 'name', 'placeholder': 'e.g. Jordan P.'}),
+            'rating': forms.Select(choices=[('', 'Select a rating')] + [(n, f'{n} star{"s" if n != 1 else ""}') for n in range(5, 0, -1)]),
+            'comment': forms.Textarea(attrs={'rows': 5, 'placeholder': 'Tell other pet owners about your stay'}),
+        }

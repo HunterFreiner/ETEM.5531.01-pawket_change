@@ -10,6 +10,10 @@
     <section class="info-panel booking-panel mx-auto mt-4 p-4 text-start">
         <dl class="booking-summary mb-4">
             <div class="d-flex justify-content-between py-2">
+                <dt>Email address</dt>
+                <dd class="mb-0">{{ booking.email }}</dd>
+            </div>
+            <div class="d-flex justify-content-between py-2">
                 <dt>Check-in / drop-off date</dt>
                 <dd class="mb-0">{{ booking.check_in_date|date:"l, F j, Y" }}</dd>
             </div>

@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
+import os
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -123,3 +124,10 @@ STATIC_URL = "static/"
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Public contact details are deployment configuration, not made-up sample data.
+# Leave a value empty until the team has confirmed it; the Contact Us page will
+# clearly say that the detail has not been published yet.
+CONTACT_PHONE = os.environ.get('PAWKET_CONTACT_PHONE', '')
+CONTACT_EMAIL = os.environ.get('PAWKET_CONTACT_EMAIL', '')
+CONTACT_ADDRESS = os.environ.get('PAWKET_CONTACT_ADDRESS', '')
