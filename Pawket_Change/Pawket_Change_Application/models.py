@@ -49,3 +49,24 @@ class Booking(models.Model):
         if pickup - drop_off <= timedelta(hours=HALF_DAY_MAX_HOURS):
             return HALF_DAY_PRICE
         return FULL_DAY_PRICE
+
+
+class Testimonial(models.Model):
+    customer_name = models.CharField(max_length=100)
+    pet_name = models.CharField(max_length=100, blank=True)
+    review_text = models.TextField()
+    rating = models.PositiveSmallIntegerField(
+        choices=[(i, f'{i} Star{"s" if i != 1 else ""}') for i in range(1, 6)],
+        null=True,
+        blank=True
+    )
+    is_approved = models.BooleanField(default=False)
+    is_verified = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f'{self.customer_name} - {self.rating or "No"} Stars'
+
