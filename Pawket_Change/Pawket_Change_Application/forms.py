@@ -103,3 +103,36 @@ class BookingForm(forms.ModelForm):
             self.add_error('pickup_time', 'That pickup time is already booked on this date. Please choose another time.')
 
         return cleaned_data
+
+
+# Customer review submission form
+from .models import Testimonial
+
+
+class TestimonialForm(forms.ModelForm):
+    class Meta:
+        model = Testimonial
+        fields = [
+            'customer_name',
+            'pet_name',
+            'rating',
+            'review_text',
+        ]
+        widgets = {
+            'customer_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': 'Your name',
+            }),
+            'pet_name': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': "Your pet's name",
+            }),
+            'rating': forms.Select(attrs={
+                'class': 'form-select',
+            }),
+            'review_text': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 4,
+                'placeholder': 'Tell us about your experience...',
+            }),
+        }

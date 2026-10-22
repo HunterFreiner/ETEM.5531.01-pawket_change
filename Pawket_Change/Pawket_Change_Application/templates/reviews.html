@@ -6,6 +6,19 @@
 {% block content %}
 <div class="container">
 
+    {% if messages %}
+        {% for message in messages %}
+            <div class="alert alert-success alert-dismissible fade show"
+                 role="alert">
+                {{ message }}
+                <button type="button"
+                        class="btn-close"
+                        data-bs-dismiss="alert"
+                        aria-label="Close"></button>
+            </div>
+        {% endfor %}
+    {% endif %}
+
     <div class="text-center mb-5">
         <h2>What Our Customers Say</h2>
         <p class="lead">
@@ -60,6 +73,65 @@
             </p>
         </div>
         {% endfor %}
+    </div>
+
+    <!-- Customer Review Submission Form -->
+    <div class="row justify-content-center mt-5">
+        <div class="col-md-8 col-lg-6">
+            <div class="card shadow-sm">
+                <div class="card-body p-4">
+
+                    <h3 class="text-center mb-3">Leave a Review</h3>
+                    <p class="text-center text-muted mb-4">
+                        Tell us about your experience with Pawket Change!
+                        Reviews are published after verification and approval.
+                    </p>
+
+                    <form method="post" action="{% url 'reviews' %}">
+                        {% csrf_token %}
+
+                        {% if form.non_field_errors %}
+                        <div class="alert alert-danger">
+                            {{ form.non_field_errors }}
+                        </div>
+                        {% endif %}
+
+                        <div class="mb-3">
+                            <label for="{{ form.customer_name.id_for_label }}"
+                                   class="form-label">Your Name</label>
+                            {{ form.customer_name }}
+                            {{ form.customer_name.errors }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.pet_name.id_for_label }}"
+                                   class="form-label">Pet's Name (optional)</label>
+                            {{ form.pet_name }}
+                            {{ form.pet_name.errors }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.rating.id_for_label }}"
+                                   class="form-label">Rating</label>
+                            {{ form.rating }}
+                            {{ form.rating.errors }}
+                        </div>
+
+                        <div class="mb-3">
+                            <label for="{{ form.review_text.id_for_label }}"
+                                   class="form-label">Your Review</label>
+                            {{ form.review_text }}
+                            {{ form.review_text.errors }}
+                        </div>
+
+                        <button type="submit" class="btn btn-primary w-100">
+                            Submit Review
+                        </button>
+                    </form>
+
+                </div>
+            </div>
+        </div>
     </div>
 
 </div>
