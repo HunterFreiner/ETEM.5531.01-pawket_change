@@ -1,10 +1,10 @@
-# Pawcket Change Branding Guidelines
+# Pawket Change Branding Guidelines
 
 Status: Sprint 1 draft, pending team and Product Owner approval.
 
 ## The name
 
-The business name is **Pawcket Change** (with the "c"). It's a play on "pocket change," and the pun only works with that spelling, so use it everywhere on the website, in the repo, and in marketing.
+The business name is **Pawket Change** (spelled without a "c"). It's a play on "pocket change," so use this exact spelling everywhere on the website, in the repo, and in marketing.
 
 Tagline: **Honest care, honest pricing.**
 
