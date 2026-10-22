@@ -4,7 +4,7 @@ from django.template import loader
 from django.utils import timezone
 
 from .forms import BookingForm, booked_slots
-from .models import Booking, BUSINESS_HOURS, FULL_DAY_PRICE, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE, OVERNIGHT_PRICE
+from .models import Booking, Testimonial, BUSINESS_HOURS, FULL_DAY_PRICE, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE, OVERNIGHT_PRICE
 
 
 def home(request):
@@ -74,3 +74,17 @@ def book(request):
 def booking_confirmation(request, booking_id):
     booking = get_object_or_404(Booking, id=booking_id)
     return render(request, 'booking_confirmation.html', {'booking': booking})
+
+
+def reviews(request):
+    testimonials = Testimonial.objects.filter(
+        is_approved=True,
+        is_verified=True
+    ).order_by('-created_at')
+
+    context = {
+        'testimonials': testimonials
+    }
+
+    return render(request, 'reviews.html', context)
+
