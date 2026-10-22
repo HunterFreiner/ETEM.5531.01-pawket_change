@@ -172,11 +172,15 @@ class ContactViewTests(TestCase):
             'message': 'Can you tell me whether next Saturday is available?',
         }
 
-    def test_contact_page_loads_with_confirmed_hours_and_clear_placeholders(self):
+    def test_contact_page_loads_with_team_provided_details_and_hours(self):
         response = self.client.get(reverse('contact'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Monday–Sunday, 8:00 AM – 6:00 PM')
-        self.assertContains(response, 'Not published yet', count=3)
+        self.assertContains(response, '<a href="tel:314-555-0142">314-555-0142</a>', html=True)
+        self.assertContains(response, '<a href="mailto:hello@pawketchange.org">hello@pawketchange.org</a>', html=True)
+        self.assertContains(response, '100 Treat Street, St. Louis, MO 63101')
+        self.assertNotContains(response, 'Not published yet')
+        self.assertNotContains(response, 'We are still confirming our public business contact details.')
         self.assertContains(response, 'All fields are required.')
 
     @override_settings(

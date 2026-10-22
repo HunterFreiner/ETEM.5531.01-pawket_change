@@ -71,9 +71,9 @@ def contact(request):
     context = {
         'form': form,
         'business_hours': BUSINESS_HOURS,
-        'contact_phone': settings.CONTACT_PHONE,
-        'contact_email': settings.CONTACT_EMAIL,
-        'contact_address': settings.CONTACT_ADDRESS,
+        'contact_phone': settings.CONTACT_PHONE or '314-555-0142',
+        'contact_email': settings.CONTACT_EMAIL or 'hello@pawketchange.org',
+        'contact_address': settings.CONTACT_ADDRESS or '100 Treat Street, St. Louis, MO 63101',
     }
     return render(request, 'contact.html', context)
 

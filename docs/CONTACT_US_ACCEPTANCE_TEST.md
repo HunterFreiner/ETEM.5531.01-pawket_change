@@ -14,7 +14,8 @@ This checklist is written for a non-developer. Complete it in a phone-sized wind
 - [ ] The navigation has a visible **Contact Us** button. On a phone, open the navigation menu first.
 - [ ] Either button opens a separate Contact Us page.
 - [ ] The page shows phone, email, address, and business hours.
-- [ ] Any contact detail that has not been confirmed says **Not published yet** rather than showing made-up information.
+- [ ] The phone is **314-555-0142**, the email is **hello@pawketchange.org**, and the address is **100 Treat Street, St. Louis, MO 63101**.
+- [ ] The phone and email links open the appropriate calling or email application, and no pending-contact-details notice appears.
 - [ ] Name, email address, and message are all required.
 - [ ] Entering an invalid email such as `name@` shows an error and does not show a success message.
 - [ ] Leaving a required field empty shows an error and does not show a success message.
@@ -32,10 +33,10 @@ Run database migrations before testing so submitted messages can be stored:
 python manage.py migrate
 ```
 
-Confirmed public business details are configured at deployment time:
+The team-provided contact details are included by default and may be overridden at deployment time:
 
 - `PAWKET_CONTACT_PHONE`
 - `PAWKET_CONTACT_EMAIL`
 - `PAWKET_CONTACT_ADDRESS`
 
-When a value is empty, the page intentionally labels that detail **Not published yet**. Submitted messages are stored as `ContactMessage` records and can be reviewed in Django admin.
+Submitted messages are stored as `ContactMessage` records and can be reviewed in Django admin.
