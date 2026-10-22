@@ -41,7 +41,10 @@
                             <a class="nav-link {% if request.resolver_match.url_name == 'about' %}active{% endif %}" href="{% url 'about' %}">About Us</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link contact-nav-button {% if request.resolver_match.url_name == 'contact' %}active{% endif %}" href="{% url 'contact' %}">Contact Us</a>
+                            <a class="nav-link {% if request.resolver_match.url_name == 'reviews' %}active{% endif %}" href="{% url 'reviews' %}">Reviews</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link {% if request.resolver_match.url_name == 'contact' %}active{% endif %}" href="{% url 'contact' %}">Contact Us</a>
                         </li>
                     </ul>
                     </div>

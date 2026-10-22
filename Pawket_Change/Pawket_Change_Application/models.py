@@ -1,6 +1,8 @@
 from datetime import datetime, time, timedelta
 
+from django.core.validators import MaxValueValidator, MinValueValidator
 from django.db import models
+from django.db.models.functions import Lower
 
 # Pawket Change is open Monday-Sunday, 8:00 AM - 6:00 PM; pickups and drop-offs must fall within these hours.
 OPENING_TIME = time(8, 0)
@@ -17,6 +19,7 @@ BUSINESS_HOURS = 'Monday–Sunday, 8:00 AM – 6:00 PM'
 
 
 class Booking(models.Model):
+    email = models.EmailField()
     check_in_date = models.DateField()
     check_out_date = models.DateField()
     drop_off_time = models.TimeField()
@@ -62,3 +65,22 @@ class ContactMessage(models.Model):
 
     def __str__(self):
         return f'Message from {self.name} ({self.email})'
+
+
+class Review(models.Model):
+    """Only someone with a booking under this email can leave a review; each email has one review, which it can edit."""
+    name = models.CharField(max_length=100)
+    email = models.EmailField()
+    rating = models.PositiveSmallIntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
+    comment = models.TextField(max_length=1000)
+    created_at = models.DateTimeField(auto_now_add=True)
+    edited_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        constraints = [
+            models.UniqueConstraint(Lower('email'), name='one_review_per_email'),
+        ]
+
+    def __str__(self):
+        return f'{self.rating}-star review from {self.name}'

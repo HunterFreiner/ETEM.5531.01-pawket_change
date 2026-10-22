@@ -10,9 +10,8 @@ This checklist is written for a non-developer. Complete it in a phone-sized wind
 
 ## User test
 
-- [ ] The home page has a visible **Contact Us** button.
 - [ ] The navigation has a visible **Contact Us** button. On a phone, open the navigation menu first.
-- [ ] Either button opens a separate Contact Us page.
+- [ ] The button opens a separate Contact Us page.
 - [ ] The page shows phone, email, address, and business hours.
 - [ ] The phone is **314-555-0142**, the email is **hello@pawketchange.org**, and the address is **100 Treat Street, St. Louis, MO 63101**.
 - [ ] The phone and email links open the appropriate calling or email application, and no pending-contact-details notice appears.

@@ -40,28 +40,17 @@ b,
 }
 
 .site-header .nav-link {
-    color: var(--white);
-    font-weight: 500;
-    border-bottom: 2px solid transparent;
-}
-
-.site-header .nav-link:hover,
-.site-header .nav-link.active {
-    color: var(--white);
-    border-bottom-color: var(--gold);
-}
-
-.site-header .contact-nav-button {
     background-color: var(--gold);
     border: 2px solid var(--gold);
     border-radius: 0.5rem;
     color: var(--ink);
+    font-weight: 500;
     padding: 0.4rem 0.8rem;
 }
 
-.site-header .contact-nav-button:hover,
-.site-header .contact-nav-button:focus,
-.site-header .contact-nav-button.active {
+.site-header .nav-link:hover,
+.site-header .nav-link:focus,
+.site-header .nav-link.active {
     background-color: var(--cream);
     border-color: var(--cream);
     color: var(--ink);
@@ -253,18 +242,32 @@ b,
     border-color: #b02a37;
 }
 
+.review-card {
+    background-color: var(--white);
+    border-left: 6px solid var(--gold);
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(18, 56, 59, 0.1);
+}
+
+.review-stars {
+    color: var(--gold);
+    font-size: 1.25rem;
+    letter-spacing: 0.1em;
+}
+
+.review-date {
+    color: #625e55;
+    font-size: 0.9rem;
+}
+
 @media (max-width: 991.98px) {
     .site-header .navbar-collapse {
         padding-top: 1rem;
     }
 
     .site-header .nav-link {
-        padding: 0.65rem 0;
-    }
-
-    .site-header .contact-nav-button {
         display: inline-block;
-        margin-top: 0.25rem;
+        margin-top: 0.5rem;
         padding: 0.5rem 0.8rem;
     }
 }
