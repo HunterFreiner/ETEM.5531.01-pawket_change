@@ -98,6 +98,11 @@ def reviews(request):
         elif action == 'change_email':
             request.session.pop('review_email', None)
             return redirect('reviews')
+        elif action == 'delete' and existing_review:
+            existing_review.delete()
+            request.session.pop('review_email', None)
+            messages.success(request, 'Your review has been deleted.')
+            return redirect('reviews')
         elif action == 'submit' and verified_email:
             review_form = ReviewForm(request.POST, instance=existing_review)
             if review_form.is_valid():

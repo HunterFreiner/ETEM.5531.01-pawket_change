@@ -302,6 +302,33 @@ class ReviewViewTests(TestCase):
         self.assertIsNone(Review.objects.get(name='Riley G.').edited_at)
         self.assertNotContains(response, 'Edited')
 
+    def test_verified_email_can_delete_its_review(self):
+        Review.objects.create(name='Riley G.', email='guest@example.com', rating=3, comment='Pretty good.')
+        response = self.verify('guest@example.com')
+        self.assertContains(response, 'Delete review')
+        response = self.client.post(reverse('reviews'), {'action': 'delete'}, follow=True)
+        self.assertFalse(Review.objects.filter(email='guest@example.com').exists())
+        self.assertContains(response, 'Your review has been deleted')
+        self.assertNotContains(response, 'Pretty good.')
+
+    def test_delete_without_verifying_does_nothing(self):
+        Review.objects.create(name='Riley G.', email='guest@example.com', rating=3, comment='Pretty good.')
+        self.client.post(reverse('reviews'), {'action': 'delete'})
+        self.assertTrue(Review.objects.filter(email='guest@example.com').exists())
+
+    def test_new_reviewer_does_not_see_delete_button(self):
+        response = self.verify('guest@example.com')
+        self.assertNotContains(response, 'Delete review')
+
+    def test_can_review_again_after_deleting(self):
+        Review.objects.create(name='Riley G.', email='guest@example.com', rating=3, comment='Pretty good.')
+        self.verify('guest@example.com')
+        self.client.post(reverse('reviews'), {'action': 'delete'})
+        response = self.verify('guest@example.com')
+        self.assertContains(response, 'Leave a review')
+        self.client.post(reverse('reviews'), self.valid_review())
+        self.assertEqual(Review.objects.get(email='guest@example.com').comment, 'Wonderful stay!')
+
     def test_change_email_returns_to_email_step(self):
         self.verify('guest@example.com')
         response = self.client.post(reverse('reviews'), {'action': 'change_email'}, follow=True)
