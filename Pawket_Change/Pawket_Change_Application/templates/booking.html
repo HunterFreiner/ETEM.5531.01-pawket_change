@@ -1,38 +1,140 @@
+
 {% extends 'base.html' %}
 {% load django_bootstrap5 %}
 
-{% block title %}Book a Stay | Pawket Change{% endblock %}
+{% block title %}Book a Service | Pawket Change{% endblock %}
 
 {% block content %}
 <div class="container text-center">
-    <h2 class="page-title mb-3">Book a Stay</h2>
-    <p class="lead tagline">Pick your dates and times &mdash; we&rsquo;re open {{ business_hours }}.</p>
+    <h2 class="page-title mb-3">Book Your Pet's Care</h2>
+    <p class="lead tagline">
+        Choose the services that work best for your pet.
+        We're open {{ business_hours }}.
+    </p>
 
     <section class="info-panel booking-panel mx-auto mt-4 p-4 text-start">
+
+        <!-- Future chatbot integration -->
+        <div class="p-3 mb-4 rounded border">
+            <h3 class="page-title h5">Need Help Choosing?</h3>
+            <p class="mb-2">
+                Not sure what your pet needs? Our upcoming assistant
+                will help recommend the right services.
+            </p>
+            <p class="text-muted small mb-0">
+                Service recommendations coming soon!
+            </p>
+        </div>
+
         <form method="post" novalidate>
             {% csrf_token %}
+
             {% if form.non_field_errors %}
-            <div class="alert alert-danger">{{ form.non_field_errors|join:" " }}</div>
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors|join:" " }}
+                </div>
             {% endif %}
 
             {% bootstrap_field form.email %}
 
-            <div class="row g-4">
-                <div class="col-12 col-md-6">
-                    <h3 class="page-title h5 mb-3">Check-in</h3>
-                    {% bootstrap_field form.check_in_date %}
-                    {% bootstrap_field form.drop_off_time %}
+            <h3 class="page-title h5 mt-4 mb-3">
+                Select Your Services
+            </h3>
+
+            <div class="mb-3">
+                {% bootstrap_field form.includes_stay %}
+            </div>
+
+            <div class="mb-4">
+                <label class="form-label fw-semibold">
+                    Grooming Services
+                </label>
+                <p class="small text-muted">
+                    Select as many grooming services as your pet needs.
+                </p>
+                {% bootstrap_field form.grooming_services show_label=False %}
+            </div>
+
+            <!-- Stay booking fields -->
+            <div id="stay-fields">
+                <h3 class="page-title h5 mb-3">Stay Details</h3>
+
+                <div class="row g-4">
+                    <div class="col-12 col-md-6">
+                        <h4 class="h6">Check-in</h4>
+                        {% bootstrap_field form.check_in_date %}
+                        {% bootstrap_field form.drop_off_time %}
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <h4 class="h6">Check-out</h4>
+                        {% bootstrap_field form.check_out_date %}
+                        {% bootstrap_field form.pickup_time %}
+                    </div>
                 </div>
-                <div class="col-12 col-md-6">
-                    <h3 class="page-title h5 mb-3">Check-out</h3>
-                    {% bootstrap_field form.check_out_date %}
-                    {% bootstrap_field form.pickup_time %}
+
+                <p class="stay-length mt-2 mb-4">
+                    Length of stay:
+                    <span id="stay-length">Select your dates</span>
+                </p>
+            </div>
+
+            <!-- Grooming-only appointment fields -->
+            <div id="grooming-fields" style="display:none;">
+                <h3 class="page-title h5 mb-3">
+                    Grooming Appointment
+                </h3>
+
+                <p class="small text-muted">
+                    Choose a preferred appointment date and time.
+                    If you're also booking a stay, grooming will
+                    take place during your pet's stay.
+                </p>
+
+                <div class="row g-4">
+                    <div class="col-12 col-md-6">
+                        {% bootstrap_field form.grooming_date %}
+                    </div>
+                    <div class="col-12 col-md-6">
+                        {% bootstrap_field form.grooming_time %}
+                    </div>
                 </div>
             </div>
 
-            <p class="stay-length mt-2 mb-4">Length of stay: <span id="stay-length">Select your dates</span></p>
+            <!-- Live booking price estimate -->
+            <div class="p-3 mt-4 mb-3 rounded border">
+                <h3 class="page-title h5 mb-3">
+                    Estimated Booking Cost
+                </h3>
 
-            <button type="submit" name="action" value="review" class="btn btn-pawket btn-lg">Review Booking</button>
+                <div class="d-flex justify-content-between py-2">
+                    <span>Stay cost</span>
+                    <span id="estimated-stay">$0</span>
+                </div>
+
+                <div class="d-flex justify-content-between py-2">
+                    <span>Grooming cost</span>
+                    <span id="estimated-grooming">$0</span>
+                </div>
+
+                <hr>
+
+                <div class="d-flex justify-content-between py-2">
+                    <strong>Estimated Total</strong>
+                    <strong id="estimated-total">$0</strong>
+                </div>
+
+                <p class="small text-muted mt-2 mb-0">
+                    Final pricing will be shown before submitting your booking.
+                </p>
+            </div>
+
+            <button type="submit"
+                    name="action"
+                    value="review"
+                    class="btn btn-pawket btn-lg mt-3">
+                Review Booking
+            </button>
         </form>
     </section>
 </div>
@@ -40,15 +142,53 @@
 
 {% block scripts %}
 {{ availability|json_script:"availability" }}
+{{ pricing|json_script:"pricing-data" }}
+
 <script>
-    // Keep check-out from being earlier than check-in, show the length of stay, and hide times that
-    // are already booked (or already passed) as the customer changes their selections.
-    const checkIn = document.getElementById('{{ form.check_in_date.id_for_label }}');
-    const checkOut = document.getElementById('{{ form.check_out_date.id_for_label }}');
-    const dropOff = document.getElementById('{{ form.drop_off_time.id_for_label }}');
-    const pickup = document.getElementById('{{ form.pickup_time.id_for_label }}');
+    const stayCheckbox = document.getElementById(
+        '{{ form.includes_stay.id_for_label }}'
+    );
+
+    const stayFields = document.getElementById('stay-fields');
+    const groomingFields = document.getElementById('grooming-fields');
+
+    const checkIn = document.getElementById(
+        '{{ form.check_in_date.id_for_label }}'
+    );
+    const checkOut = document.getElementById(
+        '{{ form.check_out_date.id_for_label }}'
+    );
+    const dropOff = document.getElementById(
+        '{{ form.drop_off_time.id_for_label }}'
+    );
+    const pickup = document.getElementById(
+        '{{ form.pickup_time.id_for_label }}'
+    );
+
     const stayLength = document.getElementById('stay-length');
-    const availability = JSON.parse(document.getElementById('availability').textContent);
+
+    const availability = JSON.parse(
+        document.getElementById('availability').textContent
+    );
+
+    const pricing = JSON.parse(
+        document.getElementById('pricing-data').textContent
+    );
+
+    const estimatedStay = document.getElementById('estimated-stay');
+    const estimatedGrooming = document.getElementById('estimated-grooming');
+    const estimatedTotal = document.getElementById('estimated-total');
+
+    const groomingCheckboxes = document.querySelectorAll(
+        'input[name="grooming_services"]'
+    );
+
+    function updateBookingFields() {
+        const includesStay = stayCheckbox.checked;
+
+        stayFields.style.display = includesStay ? 'block' : 'none';
+        groomingFields.style.display = includesStay ? 'none' : 'block';
+    }
 
     function isBooked(date, time) {
         return (availability.booked[date] || []).includes(time);
@@ -56,47 +196,150 @@
 
     function updateTimeOptions(select, isUnavailable) {
         for (const option of select.options) {
-            if (!option.value) {
-                continue;
-            }
+            if (!option.value) continue;
+
             const unavailable = isUnavailable(option.value);
             option.disabled = unavailable;
             option.hidden = unavailable;
         }
-        if (select.selectedOptions[0] && select.selectedOptions[0].disabled) {
+
+        if (
+            select.selectedOptions[0] &&
+            select.selectedOptions[0].disabled
+        ) {
             select.value = '';
         }
     }
 
     function updateTimes() {
         updateTimeOptions(dropOff, time =>
-            isBooked(checkIn.value, time) || (checkIn.value === availability.today && time <= availability.now));
+            isBooked(checkIn.value, time) ||
+            (
+                checkIn.value === availability.today &&
+                time <= availability.now
+            )
+        );
+
         updateTimeOptions(pickup, time =>
-            isBooked(checkOut.value, time) || (checkOut.value === checkIn.value && dropOff.value !== '' && time <= dropOff.value));
+            isBooked(checkOut.value, time) ||
+            (
+                checkOut.value === checkIn.value &&
+                dropOff.value !== '' &&
+                time <= dropOff.value
+            )
+        );
     }
 
     function updateStay() {
         if (checkIn.value) {
             checkOut.min = checkIn.value;
         }
+
         if (!checkIn.value || !checkOut.value) {
             stayLength.textContent = 'Select your dates';
             return;
         }
-        const nights = Math.round((new Date(checkOut.value) - new Date(checkIn.value)) / 86400000);
+
+        const nights = Math.round(
+            (
+                new Date(checkOut.value) -
+                new Date(checkIn.value)
+            ) / 86400000
+        );
+
         if (nights < 0) {
-            stayLength.textContent = 'Check-out must be on or after check-in';
+            stayLength.textContent =
+                'Check-out must be on or after check-in';
         } else if (nights === 0) {
             stayLength.textContent = 'Same-day stay';
         } else {
-            stayLength.textContent = nights + (nights === 1 ? ' night' : ' nights');
+            stayLength.textContent =
+                nights + (nights === 1 ? ' night' : ' nights');
         }
     }
 
-    checkIn.addEventListener('change', () => { updateStay(); updateTimes(); });
-    checkOut.addEventListener('change', () => { updateStay(); updateTimes(); });
+    function calculateEstimate() {
+        let stayCost = 0;
+        let groomingCost = 0;
+
+        // Calculate daycare or overnight stay pricing
+        if (
+            stayCheckbox.checked &&
+            checkIn.value &&
+            checkOut.value &&
+            dropOff.value &&
+            pickup.value
+        ) {
+            const start = new Date(checkIn.value + 'T00:00:00');
+            const end = new Date(checkOut.value + 'T00:00:00');
+
+            const nights = Math.round(
+                (end - start) / 86400000
+            );
+
+            if (nights > 0) {
+                stayCost = nights * pricing.overnight;
+            } else if (nights === 0) {
+                const [dropHour, dropMinute] =
+                    dropOff.value.split(':').map(Number);
+
+                const [pickupHour, pickupMinute] =
+                    pickup.value.split(':').map(Number);
+
+                const dropMinutes = dropHour * 60 + dropMinute;
+                const pickupMinutes = pickupHour * 60 + pickupMinute;
+                const duration = pickupMinutes - dropMinutes;
+
+                if (duration > 0) {
+                    stayCost = duration <= pricing.half_day_max_hours * 60
+                        ? pricing.half_day
+                        : pricing.full_day;
+                }
+            }
+        }
+
+        // Add selected grooming service prices
+        groomingCheckboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                groomingCost += pricing.grooming[checkbox.value] || 0;
+            }
+        });
+
+        estimatedStay.textContent = '$' + stayCost;
+        estimatedGrooming.textContent = '$' + groomingCost;
+        estimatedTotal.textContent = '$' + (stayCost + groomingCost);
+    }
+
+    // Update prices whenever booking details change
+    [
+        stayCheckbox,
+        checkIn,
+        checkOut,
+        dropOff,
+        pickup,
+        ...groomingCheckboxes
+    ].forEach(element => {
+        element.addEventListener('change', calculateEstimate);
+    });
+
+    stayCheckbox.addEventListener('change', updateBookingFields);
+
+    checkIn.addEventListener('change', () => {
+        updateStay();
+        updateTimes();
+    });
+
+    checkOut.addEventListener('change', () => {
+        updateStay();
+        updateTimes();
+    });
+
     dropOff.addEventListener('change', updateTimes);
+
+    // Initialize the page
+    updateBookingFields();
     updateStay();
     updateTimes();
+    calculateEstimate();
 </script>
 {% endblock %}
