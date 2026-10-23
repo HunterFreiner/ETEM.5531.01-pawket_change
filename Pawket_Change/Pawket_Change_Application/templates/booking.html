@@ -1,6 +1,7 @@
 
 {% extends 'base.html' %}
 {% load django_bootstrap5 %}
+{% load static %}
 
 {% block title %}Book a Service | Pawket Change{% endblock %}
 
@@ -14,17 +15,8 @@
 
     <section class="info-panel booking-panel mx-auto mt-4 p-4 text-start">
 
-        <!-- Future chatbot integration -->
-        <div class="p-3 mb-4 rounded border">
-            <h3 class="page-title h5">Need Help Choosing?</h3>
-            <p class="mb-2">
-                Not sure what your pet needs? Our upcoming assistant
-                will help recommend the right services.
-            </p>
-            <p class="text-muted small mb-0">
-                Service recommendations coming soon!
-            </p>
-        </div>
+        <!-- Pawket Change chatbot interface -->
+        {% include 'chatbot.html' %}
 
         <form method="post" novalidate>
             {% csrf_token %}
@@ -95,6 +87,7 @@
                     <div class="col-12 col-md-6">
                         {% bootstrap_field form.grooming_date %}
                     </div>
+
                     <div class="col-12 col-md-6">
                         {% bootstrap_field form.grooming_time %}
                     </div>
@@ -155,12 +148,15 @@
     const checkIn = document.getElementById(
         '{{ form.check_in_date.id_for_label }}'
     );
+
     const checkOut = document.getElementById(
         '{{ form.check_out_date.id_for_label }}'
     );
+
     const dropOff = document.getElementById(
         '{{ form.drop_off_time.id_for_label }}'
     );
+
     const pickup = document.getElementById(
         '{{ form.pickup_time.id_for_label }}'
     );
@@ -342,4 +338,7 @@
     updateTimes();
     calculateEstimate();
 </script>
+
+<!-- Load the chatbot messaging functionality -->
+<script src="{% static 'js/chatbot.js' %}"></script>
 {% endblock %}
