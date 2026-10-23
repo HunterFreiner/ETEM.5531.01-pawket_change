@@ -28,6 +28,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# Allow form submissions from the local development website
+CSRF_TRUSTED_ORIGINS = [
+    "https://localhost:8000",
+]
 
 # Application definition
 

@@ -5,7 +5,11 @@ from django import forms
 from django.db.models import Q
 from django.utils import timezone
 
-from .models import Booking, BUSINESS_HOURS, CLOSING_TIME, ContactMessage, MAX_STAY_NIGHTS, OPENING_TIME, Review, SLOT_MINUTES
+from .models import (
+    Booking, BUSINESS_HOURS, CLOSING_TIME, ContactMessage,
+    GROOMING_PRICES, GROOMING_SERVICES, MAX_STAY_NIGHTS,
+    OPENING_TIME, Review, SLOT_MINUTES,
+)
 
 
 def time_slots():
@@ -20,94 +24,258 @@ def time_slots():
 
 
 def booked_slots():
-    """Drop-off and pickup times already taken on each upcoming date, e.g. {'2026-10-20': ['08:00', '14:15']}."""
     slots = defaultdict(set)
-    for booking in Booking.objects.filter(check_out_date__gte=timezone.localdate()):
-        slots[booking.check_in_date.isoformat()].add(booking.drop_off_time.strftime('%H:%M'))
-        slots[booking.check_out_date.isoformat()].add(booking.pickup_time.strftime('%H:%M'))
+
+    for booking in Booking.objects.filter(
+        includes_stay=True,
+        check_out_date__gte=timezone.localdate(),
+        check_in_date__isnull=False,
+        drop_off_time__isnull=False,
+        pickup_time__isnull=False,
+    ):
+        slots[booking.check_in_date.isoformat()].add(
+            booking.drop_off_time.strftime('%H:%M')
+        )
+        slots[booking.check_out_date.isoformat()].add(
+            booking.pickup_time.strftime('%H:%M')
+        )
+
     return {day: sorted(times) for day, times in slots.items()}
 
 
 def slot_is_booked(day, time):
-    """Only one drop-off or pickup can happen in each time slot on a given day."""
     return Booking.objects.filter(
-        Q(check_in_date=day, drop_off_time=time) | Q(check_out_date=day, pickup_time=time)
+        Q(check_in_date=day, drop_off_time=time) |
+        Q(check_out_date=day, pickup_time=time),
+        includes_stay=True,
     ).exists()
 
 
+
 class BookingForm(forms.ModelForm):
+    grooming_services = forms.MultipleChoiceField(
+    choices=[
+        (code, f'{name} — ${GROOMING_PRICES[code]}')
+        for code, name in GROOMING_SERVICES
+    ],
+    widget=forms.CheckboxSelectMultiple,
+    required=False,
+    label='Grooming services',
+)
+
     class Meta:
         model = Booking
-        fields = ['email', 'check_in_date', 'drop_off_time', 'check_out_date', 'pickup_time']
+        fields = [
+            'email',
+            'includes_stay',
+            'grooming_services',
+            'check_in_date',
+            'drop_off_time',
+            'check_out_date',
+            'pickup_time',
+            'grooming_date',
+            'grooming_time',
+        ]
         labels = {
             'email': 'Email address',
+            'includes_stay': 'Include daycare or overnight stay',
             'check_in_date': 'Check-in / drop-off date',
             'drop_off_time': 'Drop-off time',
             'check_out_date': 'Check-out / pickup date',
             'pickup_time': 'Pickup time',
-        }
-        help_texts = {
-            'email': 'Use this email later to leave a review of your stay.',
+            'grooming_date': 'Preferred grooming date',
+            'grooming_time': 'Preferred grooming time',
         }
         widgets = {
-            'email': forms.EmailInput(attrs={'autocomplete': 'email', 'placeholder': 'you@example.com'}),
-            'check_in_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
-            'check_out_date': forms.DateInput(attrs={'type': 'date'}, format='%Y-%m-%d'),
+            'email': forms.EmailInput(attrs={
+                'autocomplete': 'email',
+                'placeholder': 'you@example.com',
+            }),
+            'includes_stay': forms.CheckboxInput(),
+            'check_in_date': forms.DateInput(
+                attrs={'type': 'date'}, format='%Y-%m-%d'
+            ),
+            'check_out_date': forms.DateInput(
+                attrs={'type': 'date'}, format='%Y-%m-%d'
+            ),
             'drop_off_time': forms.Select(choices=time_slots()),
             'pickup_time': forms.Select(choices=time_slots()),
+            'grooming_date': forms.DateInput(
+                attrs={'type': 'date'}, format='%Y-%m-%d'
+            ),
+            'grooming_time': forms.Select(choices=time_slots()),
         }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
         today = timezone.localdate().isoformat()
-        self.fields['check_in_date'].widget.attrs['min'] = today
-        self.fields['check_out_date'].widget.attrs['min'] = today
 
-    def clean_check_in_date(self):
-        check_in = self.cleaned_data['check_in_date']
-        if check_in < timezone.localdate():
-            raise forms.ValidationError('Check-in date cannot be in the past.')
-        return check_in
+        for field in [
+            'check_in_date',
+            'check_out_date',
+            'grooming_date',
+        ]:
+            self.fields[field].widget.attrs['min'] = today
 
-    def _clean_business_hours(self, field):
-        value = self.cleaned_data[field]
-        if not OPENING_TIME <= value <= CLOSING_TIME:
-            raise forms.ValidationError(f'Please choose a time during our business hours ({BUSINESS_HOURS}).')
-        if value.minute % SLOT_MINUTES or value.second:
-            raise forms.ValidationError(f'Please choose a time in {SLOT_MINUTES}-minute increments.')
-        return value
+        # Stay fields are required only when a stay is selected.
+        for field in [
+            'check_in_date',
+            'check_out_date',
+            'drop_off_time',
+            'pickup_time',
+            'grooming_date',
+            'grooming_time',
+        ]:
+            self.fields[field].required = False
 
-    def clean_drop_off_time(self):
-        return self._clean_business_hours('drop_off_time')
-
-    def clean_pickup_time(self):
-        return self._clean_business_hours('pickup_time')
+        # New bookings default to a stay, like the original form.
+        if not self.is_bound and self.instance.pk is None:
+            self.initial['includes_stay'] = True
 
     def clean(self):
-        cleaned_data = super().clean()
-        check_in = cleaned_data.get('check_in_date')
-        check_out = cleaned_data.get('check_out_date')
-        drop_off = cleaned_data.get('drop_off_time')
-        pickup = cleaned_data.get('pickup_time')
+        cleaned = super().clean()
 
-        if check_in and check_out:
-            if check_out < check_in:
-                self.add_error('check_out_date', 'Check-out date cannot be before the check-in date.')
-            elif (check_out - check_in).days > MAX_STAY_NIGHTS:
-                self.add_error('check_out_date', f'Stays can be at most {MAX_STAY_NIGHTS} nights.')
-            elif check_out == check_in and drop_off and pickup and pickup <= drop_off:
-                self.add_error('pickup_time', 'For a same-day stay, pickup must be after drop-off.')
+        includes_stay = cleaned.get('includes_stay')
+        grooming = cleaned.get('grooming_services') or []
+
+        check_in = cleaned.get('check_in_date')
+        check_out = cleaned.get('check_out_date')
+        drop_off = cleaned.get('drop_off_time')
+        pickup = cleaned.get('pickup_time')
+
+        grooming_date = cleaned.get('grooming_date')
+        grooming_time = cleaned.get('grooming_time')
+
+        # At least one service must be selected.
+        if not includes_stay and not grooming:
+            raise forms.ValidationError(
+                'Please select a stay, grooming services, or both.'
+            )
+
+        def validate_time(field, value):
+            if value is None:
+                return
+
+            if not OPENING_TIME <= value <= CLOSING_TIME:
+                self.add_error(
+                    field,
+                    f'Please choose a time during business hours ({BUSINESS_HOURS}).'
+                )
+            elif value.minute % SLOT_MINUTES or value.second:
+                self.add_error(
+                    field,
+                    f'Please choose a time in {SLOT_MINUTES}-minute increments.'
+                )
 
         now = timezone.localtime()
-        if check_in == now.date() and drop_off and drop_off <= now.time():
-            self.add_error('drop_off_time', 'That drop-off time has already passed today.')
+        today = timezone.localdate()
 
-        if check_in and drop_off and slot_is_booked(check_in, drop_off):
-            self.add_error('drop_off_time', 'That drop-off time is already booked on this date. Please choose another time.')
-        if check_out and pickup and slot_is_booked(check_out, pickup):
-            self.add_error('pickup_time', 'That pickup time is already booked on this date. Please choose another time.')
+        if includes_stay:
+            for field in [
+                'check_in_date',
+                'check_out_date',
+                'drop_off_time',
+                'pickup_time',
+            ]:
+                if not cleaned.get(field):
+                    self.add_error(field, 'This field is required for a stay.')
 
-        return cleaned_data
+            if check_in and check_in < today:
+                self.add_error(
+                    'check_in_date',
+                    'Check-in date cannot be in the past.'
+                )
+
+            if check_in and check_out:
+                if check_out < check_in:
+                    self.add_error(
+                        'check_out_date',
+                        'Check-out cannot be before check-in.'
+                    )
+                elif (check_out - check_in).days > MAX_STAY_NIGHTS:
+                    self.add_error(
+                        'check_out_date',
+                        f'Stays can be at most {MAX_STAY_NIGHTS} nights.'
+                    )
+                elif (
+                    check_out == check_in
+                    and drop_off
+                    and pickup
+                    and pickup <= drop_off
+                ):
+                    self.add_error(
+                        'pickup_time',
+                        'Pickup must be after drop-off for same-day stays.'
+                    )
+
+            validate_time('drop_off_time', drop_off)
+            validate_time('pickup_time', pickup)
+
+            if check_in == today and drop_off and drop_off <= now.time():
+                self.add_error(
+                    'drop_off_time',
+                    'That drop-off time has already passed.'
+                )
+
+            if check_in and drop_off and slot_is_booked(check_in, drop_off):
+                self.add_error(
+                    'drop_off_time',
+                    'That drop-off slot is already booked.'
+                )
+
+            if check_out and pickup and slot_is_booked(check_out, pickup):
+                self.add_error(
+                    'pickup_time',
+                    'That pickup slot is already booked.'
+                )
+
+            # Grooming is performed during the stay.
+            cleaned['grooming_date'] = None
+            cleaned['grooming_time'] = None
+
+        else:
+            # Grooming-only bookings don't require stay details.
+            for field in [
+                'check_in_date',
+                'check_out_date',
+                'drop_off_time',
+                'pickup_time',
+            ]:
+                cleaned[field] = None
+
+            if not grooming_date:
+                self.add_error(
+                    'grooming_date',
+                    'Please select a grooming appointment date.'
+                )
+
+            if not grooming_time:
+                self.add_error(
+                    'grooming_time',
+                    'Please select a grooming appointment time.'
+                )
+
+            if grooming_date and grooming_date < today:
+                self.add_error(
+                    'grooming_date',
+                    'Grooming date cannot be in the past.'
+                )
+
+            validate_time('grooming_time', grooming_time)
+
+            if (
+                grooming_date == today
+                and grooming_time
+                and grooming_time <= now.time()
+            ):
+                self.add_error(
+                    'grooming_time',
+                    'That appointment time has already passed.'
+                )
+
+        return cleaned
+
 
 
 class ContactForm(forms.ModelForm):

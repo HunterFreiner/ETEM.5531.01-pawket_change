@@ -17,41 +17,120 @@ HALF_DAY_MAX_HOURS = 4
 OVERNIGHT_PRICE = 45
 BUSINESS_HOURS = 'Monday–Sunday, 8:00 AM – 6:00 PM'
 
+GROOMING_SERVICES = [
+    ('bath', 'Bath'),
+    ('haircut', 'Haircut'),
+    ('nail_trimming', 'Nail trimming'),
+    ('deshedding', 'Brush / deshedding'),
+    ('ear_cleaning', 'Ear cleaning'),
+]
+
+GROOMING_PRICES = {
+    'bath': 30,
+    'haircut': 40,
+    'nail_trimming': 12,
+    'deshedding': 20,
+    'ear_cleaning': 10,
+}
+
+
 
 class Booking(models.Model):
     email = models.EmailField()
-    check_in_date = models.DateField()
-    check_out_date = models.DateField()
-    drop_off_time = models.TimeField()
-    pickup_time = models.TimeField()
+
+    # Whether the customer is booking a stay
+    includes_stay = models.BooleanField(default=True)
+
+    # Existing stay booking fields
+    check_in_date = models.DateField(null=True, blank=True)
+    check_out_date = models.DateField(null=True, blank=True)
+    drop_off_time = models.TimeField(null=True, blank=True)
+    pickup_time = models.TimeField(null=True, blank=True)
+
+    # Grooming services selected by the customer
+    grooming_services = models.JSONField(default=list, blank=True)
+
+    # Used when booking grooming without a stay
+    grooming_date = models.DateField(null=True, blank=True)
+    grooming_time = models.TimeField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         ordering = ['-created_at']
 
     def __str__(self):
-        return f'Booking {self.check_in_date} to {self.check_out_date}'
+        if self.includes_stay:
+            return f'Booking {self.check_in_date} to {self.check_out_date}'
+        return f'Grooming booking for {self.grooming_date}'
 
     @property
     def nights(self):
+        if not self.includes_stay or not self.check_in_date or not self.check_out_date:
+            return 0
         return (self.check_out_date - self.check_in_date).days
 
     @property
     def length_of_stay(self):
+        if not self.includes_stay:
+            return 'Grooming appointment'
         if self.nights == 0:
             return 'Same-day stay'
         return f'{self.nights} night{"s" if self.nights != 1 else ""}'
 
     @property
+    def grooming_service_names(self):
+        service_labels = dict(GROOMING_SERVICES)
+        return [
+            service_labels.get(service, service)
+            for service in self.grooming_services
+        ]
+
+    @property
     def cost(self):
-        """Overnight stays are charged per night; same-day stays are half-day or full-day daycare."""
+        """
+        Calculate stay cost using existing pricing.
+        Grooming pricing will be added separately.
+        """
+        if not self.includes_stay:
+            return 0
+
+        if not all([
+            self.check_in_date,
+            self.check_out_date,
+            self.drop_off_time,
+            self.pickup_time
+        ]):
+            return 0
+
         if self.nights > 0:
             return self.nights * OVERNIGHT_PRICE
-        drop_off = datetime.combine(self.check_in_date, self.drop_off_time)
-        pickup = datetime.combine(self.check_out_date, self.pickup_time)
+
+        drop_off = datetime.combine(
+            self.check_in_date,
+            self.drop_off_time
+        )
+        pickup = datetime.combine(
+            self.check_out_date,
+            self.pickup_time
+        )
+
         if pickup - drop_off <= timedelta(hours=HALF_DAY_MAX_HOURS):
             return HALF_DAY_PRICE
+
         return FULL_DAY_PRICE
+
+    @property
+    def grooming_cost(self):
+        return sum(
+            GROOMING_PRICES.get(service, 0)
+            for service in self.grooming_services
+        )
+
+    @property
+    def total_cost(self):
+        return self.cost + self.grooming_cost
+
 
 
 class ContactMessage(models.Model):
