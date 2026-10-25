@@ -21,6 +21,7 @@ def booking_data(check_in_offset=1, check_out_offset=3, drop_off='10:00', pickup
     today = timezone.localdate()
     return {
         'email': 'guest@example.com',
+        'includes_stay': 'on',
         'check_in_date': (today + timedelta(days=check_in_offset)).isoformat(),
         'check_out_date': (today + timedelta(days=check_out_offset)).isoformat(),
         'drop_off_time': drop_off,
@@ -130,7 +131,8 @@ class BookingViewTests(TestCase):
         self.client.post(reverse('book'), {**booking_data(), 'action': 'confirm'})
         response = self.client.get(reverse('booking_confirmation', args=[Booking.objects.get().id]))
         self.assertContains(response, 'has been received')
-        self.assertContains(response, 'The cost for the stay will be <strong>$90</strong>')
+        self.assertContains(response, '<span>Stay cost</span>')
+        self.assertContains(response, '<strong>$90</strong>')
 
     def test_review_shows_cost(self):
         response = self.client.post(reverse('book'), {**booking_data(), 'action': 'review'})
@@ -151,6 +153,48 @@ class BookingCostTests(TestCase):
 
     def test_same_day_over_four_hours_is_full_day(self):
         self.assertEqual(self.cost(check_out_offset=1, drop_off='08:00', pickup='12:15'), 25)
+
+
+class GroomingBookingTests(TestCase):
+    def grooming_only(self, **overrides):
+        data = {
+            'email': 'guest@example.com',
+            'grooming_services': ['bath', 'nail_trimming'],
+            'grooming_date': (timezone.localdate() + timedelta(days=2)).isoformat(),
+            'grooming_time': '11:00',
+        }
+        return BookingForm({**data, **overrides})
+
+    def test_grooming_only_booking_is_valid_and_priced(self):
+        form = self.grooming_only()
+        self.assertTrue(form.is_valid(), form.errors)
+        booking = form.save()
+        self.assertEqual((booking.cost, booking.grooming_cost, booking.total_cost), (0, 42, 42))
+        self.assertEqual(booking.grooming_service_names, ['Bath', 'Nail trimming'])
+
+    def test_booking_needs_a_stay_or_grooming(self):
+        form = BookingForm({'email': 'guest@example.com'})
+        self.assertIn('Please select a stay, grooming services, or both.', form.non_field_errors())
+
+    def test_grooming_only_needs_date_and_time(self):
+        form = self.grooming_only(grooming_date='', grooming_time='')
+        self.assertIn('grooming_date', form.errors)
+        self.assertIn('grooming_time', form.errors)
+
+    def test_grooming_in_past_or_outside_hours_is_invalid(self):
+        form = self.grooming_only(grooming_date=(timezone.localdate() - timedelta(days=1)).isoformat(), grooming_time='19:00')
+        self.assertIn('grooming_date', form.errors)
+        self.assertIn('grooming_time', form.errors)
+
+    def test_stay_with_grooming_adds_both_costs(self):
+        form = BookingForm({**booking_data(), 'grooming_services': ['haircut']})
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.save().total_cost, 90 + 40)
+
+    def test_stay_fields_required_when_stay_is_selected(self):
+        form = BookingForm({'email': 'guest@example.com', 'includes_stay': 'on'})
+        self.assertIn('check_in_date', form.errors)
+        self.assertIn('pickup_time', form.errors)
 
 
 class ContactFormTests(TestCase):
@@ -437,7 +481,7 @@ class ContactChatTests(AITestCase):
     def test_chat_reply(self):
         self.claude.messages.create.return_value = text_response('Overnight boarding is $45 a night.')
         response = self.ask()
-        self.assertEqual(response.json(), {'reply': 'Overnight boarding is $45 a night.', 'booking': None})
+        self.assertEqual(response.json(), {'reply': 'Overnight boarding is $45 a night.', 'booking': None, 'recommendations': None})
         system = self.claude.messages.create.call_args.kwargs['system'][0]['text']
         self.assertIn('Overnight Boarding: $45/night', system)
 
@@ -512,6 +556,59 @@ class ContactChatTests(AITestCase):
         self.assertIn('Not a valid slot', ai._check_availability(day, '19:00')[0])
         self.assertIn('Not a valid slot', ai._check_availability(day, '10:10')[0])
         self.assertIn('Invalid', ai._check_availability('tomorrow', '10:00')[0])
+
+
+class BookingChatTests(AITestCase):
+    def ask(self, question='My doodle is matted and needs a trim'):
+        return self.client.post(
+            reverse('booking_chat'), json.dumps({'messages': [{'role': 'user', 'content': question}]}),
+            content_type='application/json',
+        )
+
+    def test_booking_page_shows_assistant_and_ai_notice(self):
+        response = self.client.get(reverse('book'))
+        self.assertContains(response, 'Pawket Change Assistant')
+        self.assertContains(response, 'sent\n            to Anthropic')
+        self.assertContains(response, 'js/chatbot.js')
+
+    @override_settings(PAWKET_AI_ENABLED=False)
+    def test_assistant_is_hidden_when_ai_is_disabled(self):
+        response = self.client.get(reverse('book'))
+        self.assertNotContains(response, 'Pawket Change Assistant')
+        self.assertNotContains(response, 'js/chatbot.js')
+
+    def test_recommendations_are_returned_for_the_form(self):
+        self.claude.messages.create.side_effect = [
+            tool_use_response('recommend_services', {'includes_stay': False, 'grooming_services': ['haircut', 'deshedding']}),
+            text_response('A haircut ($40) and deshedding ($20) would help.'),
+        ]
+        data = self.ask().json()
+        self.assertEqual(data['recommendations'], {'includes_stay': False, 'grooming_services': ['haircut', 'deshedding']})
+        self.assertEqual(data['reply'], 'A haircut ($40) and deshedding ($20) would help.')
+        kwargs = self.claude.messages.create.call_args.kwargs
+        self.assertIn('recommend_services', [tool['name'] for tool in kwargs['tools']])
+        self.assertIn('Book a Stay page', kwargs['system'][0]['text'])
+        self.assertIn('Haircut (haircut): $40', kwargs['system'][0]['text'])
+
+    def test_unknown_or_empty_recommendations_are_dropped(self):
+        result, recommendations = ai._recommend_services({'includes_stay': False, 'grooming_services': ['spa_day']})
+        self.assertIsNone(recommendations)
+        self.assertIn('Nothing to recommend', result)
+
+    def test_contact_chat_cannot_recommend_form_services(self):
+        self.claude.messages.create.return_value = text_response('Hi!')
+        self.client.post(
+            reverse('contact_chat'), json.dumps({'messages': [{'role': 'user', 'content': 'Hi'}]}),
+            content_type='application/json',
+        )
+        tools = [tool['name'] for tool in self.claude.messages.create.call_args.kwargs['tools']]
+        self.assertNotIn('recommend_services', tools)
+
+    def test_api_failure_returns_friendly_fallback(self):
+        self.claude.messages.create.side_effect = CONNECTION_ERROR
+        data = self.ask().json()
+        self.assertIn('Contact Us page', data['reply'])
+        self.assertIsNone(data['recommendations'])
 
 
 class ChatHandoffTests(AITestCase):

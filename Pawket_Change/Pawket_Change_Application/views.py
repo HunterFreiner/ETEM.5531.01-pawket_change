@@ -15,14 +15,17 @@ from django.views.decorators.http import require_POST
 
 from . import ai
 from .forms import BookingForm, ContactForm, ReviewEmailForm, ReviewForm, booked_slots
-from .models import ADD_ONS, BUSINESS_HOURS, PRICING_POLICIES, SERVICES, Booking, ContactMessage, Review
+from .models import (
+    ADD_ONS, BUSINESS_HOURS, FULL_DAY_PRICE, GROOMING_PRICES, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE, OVERNIGHT_PRICE,
+    PRICING_POLICIES, SERVICES, Booking, ContactMessage, Review,
+)
 
 # Limits for the Contact page chat, so one visitor can't run up the API bill.
 CHAT_MAX_TURNS = 20
 CHAT_MAX_MESSAGE_LENGTH = 1000
 CHAT_MESSAGES_PER_HOUR = 20
 CHAT_UNAVAILABLE_REPLY = (
-    "Sorry, I can't answer right now. You can send your question to our team with the form on this page."
+    "Sorry, I can't answer right now. You can send your question to our team on the Contact Us page."
 )
 
 
@@ -36,11 +39,13 @@ def home(request):
 
 def services(request):
     template = loader.get_template('services.html')
+
     context = {
         'services': SERVICES,
         'add_ons': ADD_ONS,
         'policies': PRICING_POLICIES,
     }
+
     return HttpResponse(template.render(context, request))
 
 
@@ -51,12 +56,16 @@ def about(request):
 
 def contact(request):
     form = ContactForm(request.POST or None)
+
     if request.method == 'POST' and form.is_valid():
         try:
             contact_message = form.save()
         except DatabaseError:
             logger.exception('Unable to save a contact message.')
-            form.add_error(None, 'We could not send your message right now. Please try again later.')
+            form.add_error(
+                None,
+                'We could not send your message right now. Please try again later.',
+            )
         else:
             ai.tag_contact_message(contact_message)
             messages.success(
@@ -73,6 +82,7 @@ def contact(request):
         'contact_address': settings.CONTACT_ADDRESS or '100 Treat Street, St. Louis, MO 63101',
         'ai_enabled': ai.is_enabled(),
     }
+
     return render(request, 'contact.html', context)
 
 
@@ -113,21 +123,31 @@ def _read_json(request):
         return None
 
 
-@require_POST
-def contact_chat(request):
+def _chat(request, page):
     data = _read_json(request)
     history = _clean_chat_history(data.get('messages') if isinstance(data, dict) else None)
     if history is None:
         return JsonResponse({'error': 'Invalid chat message.'}, status=400)
     if _chat_rate_limited(request):
         return JsonResponse({
-            'reply': "You've sent a lot of messages in the last hour. Please send your question to our team with the form on this page.",
+            'reply': "You've sent a lot of messages in the last hour. Please send your question to our team on the Contact Us page.",
             'booking': None,
+            'recommendations': None,
         }, status=429)
-    result = ai.chat_reply(history)
+    result = ai.chat_reply(history, page=page)
     if result is None:
-        return JsonResponse({'reply': CHAT_UNAVAILABLE_REPLY, 'booking': None})
+        return JsonResponse({'reply': CHAT_UNAVAILABLE_REPLY, 'booking': None, 'recommendations': None})
     return JsonResponse(result)
+
+
+@require_POST
+def contact_chat(request):
+    return _chat(request, 'contact')
+
+
+@require_POST
+def booking_chat(request):
+    return _chat(request, 'booking')
 
 
 def _chat_transcript(history):
@@ -176,33 +196,57 @@ def contact_chat_handoff(request):
 
 
 def reviews(request):
-    # A guest first proves they have a booking by entering its email; that email is kept in the
-    # session so the review form can only be submitted for a recognized booking. If that email already
-    # has a review, the form edits it instead of creating a second one.
+    # A guest first proves they have a booking by entering its email.
+    # That email is kept in the session so the review form can only
+    # be submitted for a recognized booking.
+    # If that email already has a review, the form edits it instead
+    # of creating a second one.
+
     verified_email = request.session.get('review_email')
-    existing_review = Review.objects.filter(email__iexact=verified_email).first() if verified_email else None
+
+    existing_review = (
+        Review.objects.filter(email__iexact=verified_email).first()
+        if verified_email
+        else None
+    )
+
     email_form = ReviewEmailForm()
-    review_form = ReviewForm(instance=existing_review) if verified_email else None
+
+    review_form = (
+        ReviewForm(instance=existing_review)
+        if verified_email
+        else None
+    )
 
     if request.method == 'POST':
         action = request.POST.get('action')
+
         if action == 'verify':
             email_form = ReviewEmailForm(request.POST)
+
             if email_form.is_valid():
                 request.session['review_email'] = email_form.cleaned_data['email']
                 return redirect('reviews')
+
         elif action == 'change_email':
             request.session.pop('review_email', None)
             return redirect('reviews')
+
         elif action == 'delete' and existing_review:
             existing_review.delete()
             request.session.pop('review_email', None)
             messages.success(request, 'Your review has been deleted.')
             return redirect('reviews')
+
         elif action == 'submit' and verified_email:
-            review_form = ReviewForm(request.POST, instance=existing_review)
+            review_form = ReviewForm(
+                request.POST,
+                instance=existing_review,
+            )
+
             if review_form.is_valid():
                 review = review_form.save(commit=False)
+
                 if existing_review:
                     review.edited_at = timezone.now()
                     success = 'Your review has been updated.'
@@ -219,6 +263,7 @@ def reviews(request):
                 review.save()
                 request.session.pop('review_email', None)
                 messages.success(request, success)
+
                 return redirect('reviews')
 
     review_list = Review.objects.filter(status=Review.PUBLISHED)
@@ -231,6 +276,7 @@ def reviews(request):
         'verified_email': verified_email,
         'existing_review': existing_review,
     }
+
     return render(request, 'reviews.html', context)
 
 
@@ -238,20 +284,49 @@ def book(request):
     if request.method == 'POST':
         form = BookingForm(request.POST)
         action = request.POST.get('action')
+
         if form.is_valid() and action != 'edit':
             if action == 'confirm':
                 booking = form.save()
-                return redirect('booking_confirmation', booking_id=booking.id)
-            return render(request, 'booking_review.html', {'form': form, 'booking': form.instance})
+
+                return redirect(
+                    'booking_confirmation',
+                    booking_id=booking.id,
+                )
+
+            return render(
+                request,
+                'booking_review.html',
+                {
+                    'form': form,
+                    'booking': form.instance,
+                },
+            )
     else:
         form = BookingForm(initial=_booking_prefill(request.GET))
     now = timezone.localtime()
+
     availability = {
         'booked': booked_slots(),
         'today': now.date().isoformat(),
         'now': now.strftime('%H:%M'),
     }
-    context = {'form': form, 'business_hours': BUSINESS_HOURS, 'availability': availability}
+
+    # Pricing information for the live booking estimate
+    context = {
+        'form': form,
+        'business_hours': BUSINESS_HOURS,
+        'availability': availability,
+        'ai_enabled': ai.is_enabled(),
+        'pricing': {
+            'full_day': FULL_DAY_PRICE,
+            'half_day': HALF_DAY_PRICE,
+            'half_day_max_hours': HALF_DAY_MAX_HOURS,
+            'overnight': OVERNIGHT_PRICE,
+            'grooming': GROOMING_PRICES,
+        },
+    }
+
     return render(request, 'booking.html', context)
 
 
@@ -273,4 +348,11 @@ def _booking_prefill(params):
 
 def booking_confirmation(request, booking_id):
     booking = get_object_or_404(Booking, id=booking_id)
-    return render(request, 'booking_confirmation.html', {'booking': booking})
+
+    return render(
+        request,
+        'booking_confirmation.html',
+        {
+            'booking': booking,
+        },
+    )

@@ -3,6 +3,7 @@
 Pawket Change uses Claude (Claude Haiku 5.5, made by Anthropic) for:
 
 - **Contact page assistant:** answers questions about services, prices, and hours, checks open time slots, and gives a "Review this booking" button that fills in the booking form. It never books by itself. Customers can send the chat to the team with one button.
+- **Book a Stay assistant:** on the booking page, the assistant recommends a stay and grooming services based on the dog's needs. **Apply Recommendations** ticks them on the form without removing anything the customer already picked.
 - **Contact message tags:** every Contact Us message, and every chat sent to the team, gets a category and a priority in the Django admin.
 - **Review moderation:** reviews with spam, abuse, or private details are held as *pending* until staff publish them. Negative reviews are never held for being negative.
 - **Review summary:** a short "What guests are saying" summary on the Reviews page once there are at least 3 published reviews. It's only rewritten after reviews change.
@@ -33,7 +34,7 @@ Optional settings:
 ## Developer notes
 
 - Install dependencies with `pip install -r requirements.txt`, then run `python manage.py migrate`.
-- All Claude calls are in `Pawket_Change_Application/ai.py`. Prices and services come from `SERVICES`, `ADD_ONS`, and `PRICING_POLICIES` in `models.py`, the same lists the Services page uses, so the assistant's answers stay up to date.
+- All Claude calls are in `Pawket_Change_Application/ai.py`. Prices and services come from `SERVICES`, `ADD_ONS`, `PRICING_POLICIES`, `GROOMING_SERVICES`, and `GROOMING_PRICES` in `models.py`, the same lists the Services page uses, so the assistant's answers stay up to date.
 - The test suite mocks Claude and never calls the real API, even if a key is set.
 - The chat allows 20 messages per visitor per hour and 1,000 characters per message.
 
@@ -51,6 +52,12 @@ Run with the API key set. Record the tester's name, date, browser/device, and an
 - [ ] **Send this conversation to our team** asks for name and email. A bad email shows an error. A good one shows a thank-you, and the message appears in the admin with the chat transcript.
 - [ ] Off-topic requests (for example "Write me a poem about cars") are politely declined.
 - [ ] The chat works with a keyboard and at phone width.
+
+### Book a Stay assistant
+
+- [ ] The Book a Stay page shows **Pawket Change Assistant** with the AI and Anthropic notice.
+- [ ] Saying "My dog's coat is matted and long" recommends grooming such as a haircut or deshedding, with prices, and shows **Apply Recommendations**.
+- [ ] **Apply Recommendations** ticks those boxes on the form, keeps any boxes already ticked, and updates the price estimate.
 
 ### Contact message tags
 

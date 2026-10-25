@@ -1,0 +1,54 @@
+
+<div class="card mb-4" id="pawket-chatbot" data-chat-url="{% url 'booking_chat' %}">
+    <div class="card-header">
+        <h3 class="h5 mb-0">
+            Pawket Change Assistant
+        </h3>
+    </div>
+
+    <div class="card-body">
+        <p class="text-muted small">
+            Need help choosing services? Ask our assistant!
+        </p>
+
+        <!-- Conversation area -->
+        <div id="chat-messages"
+             class="border rounded p-3 mb-3"
+             style="height: 250px; overflow-y: auto;"
+             aria-live="polite">
+
+            <div class="mb-3">
+                <strong>Pawket Assistant:</strong>
+                <p class="mb-0">
+                    Hi! I'm here to help you find the right
+                    services for your pet. What can I help
+                    you with today?
+                </p>
+            </div>
+        </div>
+
+        <!-- Message input -->
+        <div class="input-group">
+            <input
+                type="text"
+                id="chat-input"
+                class="form-control"
+                placeholder="Ask about our services..."
+                aria-label="Chat message"
+            >
+
+            <button
+                type="button"
+                id="chat-send"
+                class="btn btn-pawket">
+                Send
+            </button>
+        </div>
+
+        <p class="small text-muted mt-2 mb-0">
+            This assistant is AI and can make mistakes. What you type is sent
+            to Anthropic, the company that makes the AI, to write a reply.
+            Please don't share private details like card numbers.
+        </p>
+    </div>
+</div>
