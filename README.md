@@ -115,6 +115,9 @@ Example:
 - install-command
 - start-command
 
+### 🤖 AI features
+The Contact page assistant, contact message tags, and review moderation, summaries, and reply drafts use Claude. They turn on when `ANTHROPIC_API_KEY` is set. See [docs/AI_FEATURES.md](docs/AI_FEATURES.md) for API key setup and the acceptance test.
+
 ## 📁 Project Structure
 - This section can be updated as the project structure is established.
 ```text

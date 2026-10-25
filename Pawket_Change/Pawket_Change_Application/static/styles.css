@@ -260,6 +260,196 @@ b,
     font-size: 0.9rem;
 }
 
+/* Booking form: one card per dog */
+.pet-card {
+    border: 1px solid var(--rule);
+    border-radius: 0.75rem;
+    background-color: var(--cream);
+}
+
+.pet-care-details summary {
+    color: var(--teal);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.pet-summary + .pet-summary {
+    border-top: 1px solid var(--rule);
+}
+
+.pet-summary-label {
+    color: var(--teal);
+    font-weight: 500;
+}
+
+/* AI features: Contact page chat, review summary, and owner replies. */
+.chat-notice {
+    color: #625e55;
+    font-size: 0.9rem;
+}
+
+.chat-log {
+    max-height: 22rem;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.chat-message {
+    max-width: 85%;
+    margin: 0;
+    padding: 0.6rem 0.9rem;
+    border-radius: 0.75rem;
+    white-space: pre-wrap;
+}
+
+.chat-message-assistant {
+    align-self: flex-start;
+    background-color: var(--cream);
+    border: 1px solid var(--rule);
+}
+
+.chat-message-user {
+    align-self: flex-end;
+    background-color: var(--teal);
+    color: var(--white);
+}
+
+.chat-message-pending {
+    font-style: italic;
+    color: #625e55;
+}
+
+.chat-booking-link {
+    align-self: flex-start;
+}
+
+.chat-panel .btn-link,
+.chat-booking-link.btn-link {
+    color: var(--teal);
+}
+
+.review-summary {
+    background-color: var(--white);
+    border-left: 6px solid var(--teal);
+    border-radius: 0.75rem;
+    box-shadow: 0 2px 8px rgba(18, 56, 59, 0.1);
+}
+
+.owner-reply {
+    border-left: 3px solid var(--rule);
+}
+
+.owner-reply-label {
+    color: var(--teal);
+    font-weight: 500;
+    font-size: 0.9rem;
+}
+
+/* Animations. Kept small and quick to fit the plain, friendly brand. Everything below is skipped for visitors
+   who have turned on "reduce motion" on their device. */
+@media (prefers-reduced-motion: no-preference) {
+    /* Content fading up into view; animations.js adds these classes. */
+    .reveal {
+        opacity: 0;
+        transform: translateY(16px);
+        transition: opacity 0.5s ease-out, transform 0.5s ease-out;
+        transition-delay: var(--reveal-delay, 0ms);
+    }
+
+    .reveal.is-visible {
+        opacity: 1;
+        transform: none;
+    }
+
+    /* Cards lift slightly on hover. Hover uses translate/scale, separate from the reveal's transform,
+       so the two effects never interrupt each other. */
+    .price-card,
+    .team-card,
+    .review-card {
+        transition-property: opacity, transform, translate, box-shadow;
+        transition-duration: 0.5s, 0.5s, 0.2s, 0.2s;
+        transition-delay: var(--reveal-delay, 0ms), var(--reveal-delay, 0ms), 0s, 0s;
+    }
+
+    .price-card:hover,
+    .team-card:hover,
+    .review-card:hover {
+        translate: 0 -4px;
+        box-shadow: 0 8px 20px rgba(18, 56, 59, 0.15);
+    }
+
+    .dog-photo,
+    .team-photo {
+        transition-property: opacity, transform, scale;
+        transition-duration: 0.5s, 0.5s, 0.3s;
+        transition-delay: var(--reveal-delay, 0ms), var(--reveal-delay, 0ms), 0s;
+    }
+
+    .dog-photo:hover,
+    .team-card:hover .team-photo {
+        scale: 1.03;
+    }
+
+    /* Buttons and navigation */
+    .btn-pawket {
+        transition: background-color 0.2s ease, translate 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .btn-pawket:hover {
+        translate: 0 -2px;
+        box-shadow: 0 4px 10px rgba(18, 56, 59, 0.2);
+    }
+
+    .btn-pawket:active {
+        translate: 0 0;
+        box-shadow: none;
+    }
+
+    .site-header .nav-link {
+        transition: background-color 0.2s ease, border-color 0.2s ease;
+    }
+
+    .navbar-brand:hover .header-icon {
+        animation: paw-wiggle 0.5s ease-in-out;
+    }
+
+    @keyframes paw-wiggle {
+        25% { transform: rotate(-8deg); }
+        75% { transform: rotate(8deg); }
+    }
+
+    /* Success and error messages slide in. */
+    main .alert {
+        animation: slide-down 0.35s ease-out;
+    }
+
+    @keyframes slide-down {
+        from { opacity: 0; transform: translateY(-8px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    /* Chat messages pop in, and "Thinking…" gently pulses. */
+    .chat-message,
+    .chat-booking-link {
+        animation: chat-in 0.25s ease-out;
+    }
+
+    @keyframes chat-in {
+        from { opacity: 0; transform: translateY(6px); }
+        to { opacity: 1; transform: none; }
+    }
+
+    .chat-message-pending {
+        animation: chat-in 0.25s ease-out, pulse 1.2s ease-in-out 0.25s infinite;
+    }
+
+    @keyframes pulse {
+        50% { opacity: 0.5; }
+    }
+}
+
 @media (max-width: 991.98px) {
     .site-header .navbar-collapse {
         padding-top: 1rem;

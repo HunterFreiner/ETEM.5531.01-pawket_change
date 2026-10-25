@@ -25,6 +25,13 @@
 
     <div class="row g-4 align-items-start">
         <div class="col-lg-7">
+            {% if review_summary %}
+                <section class="review-summary p-4 mb-4" aria-labelledby="review-summary-heading">
+                    <h3 id="review-summary-heading" class="h5 service-name mb-2">What guests are saying</h3>
+                    <p class="mb-2">{{ review_summary.text }}</p>
+                    <p class="review-date mb-0">Summarized by AI from {{ review_summary.review_count }} reviews.</p>
+                </section>
+            {% endif %}
             {% for review in reviews %}
                 <article class="review-card p-4 mb-3">
                     <div class="d-flex justify-content-between align-items-baseline flex-wrap gap-2 mb-2">
@@ -35,6 +42,12 @@
                     <p class="review-date mb-0">
                         {{ review.created_at|date:"F j, Y" }}{% if review.edited_at %} &middot; Edited {{ review.edited_at|date:"F j, Y" }}{% endif %}
                     </p>
+                    {% if review.owner_reply %}
+                        <div class="owner-reply mt-3 ps-3">
+                            <p class="owner-reply-label mb-1">Reply from Pawket Change</p>
+                            <p class="mb-0">{{ review.owner_reply|linebreaksbr }}</p>
+                        </div>
+                    {% endif %}
                 </article>
             {% empty %}
                 <p class="text-center">No reviews yet. Be the first!</p>
@@ -68,7 +81,7 @@
                         {% endif %}
                     </div>
                 {% else %}
-                    <p class="mb-4">Enter the email you used to book a stay to leave a review, or to edit the one you already left. Only guests with a booking can leave a review.</p>
+                    <p class="mb-4">Enter the email you used to book with us to leave a review, or to edit the one you already left. Only guests with a booking can leave a review.</p>
                     <form method="post" novalidate>
                         {% csrf_token %}
                         {% bootstrap_form email_form %}
