@@ -1,0 +1,10 @@
+{# Each dog on a booking. Used on the review and confirmation pages, with `pets` as a list of Pet objects. #}
+{% for pet in pets %}
+    <div class="pet-summary py-2">
+        <p class="service-name fw-bold mb-1">{{ pet.name }}</p>
+        <p class="mb-1">{{ pet.breed }} &middot; {{ pet.get_size_display }} &middot; {% if pet.age == 0 %}Under 1 year{% else %}{{ pet.age }} year{{ pet.age|pluralize }}{% endif %}</p>
+        {% if pet.special_instructions %}<p class="mb-1"><span class="pet-summary-label">Special care:</span> {{ pet.special_instructions|linebreaksbr }}</p>{% endif %}
+        {% if pet.medications %}<p class="mb-1"><span class="pet-summary-label">Medications:</span> {{ pet.medications|linebreaksbr }}</p>{% endif %}
+        {% if pet.dietary_needs %}<p class="mb-1"><span class="pet-summary-label">Diet:</span> {{ pet.dietary_needs|linebreaksbr }}</p>{% endif %}
+    </div>
+{% endfor %}

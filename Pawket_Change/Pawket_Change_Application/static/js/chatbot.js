@@ -93,12 +93,87 @@ document.addEventListener("DOMContentLoaded", function () {
         );
     }
 
-    // Display an assistant response and an Apply button.
+    function setField(name, value) {
+        const field = document.querySelector(`[name="${name}"]`);
+
+        if (!field || value === undefined) {
+            return;
+        }
+
+        field.value = value;
+        field.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+
+    // Fill in the booking form from a booking the assistant prepared. The stay choice, number of dogs,
+    // dates, and times are set to what the customer asked for; grooming services are only added, never
+    // removed. The customer's name, contact, and dog details are left as they are.
+    function applyBooking(prefill) {
+        const stayCheckbox = document.querySelector('input[name="includes_stay"]');
+
+        if (stayCheckbox && stayCheckbox.checked !== prefill.includes_stay) {
+            stayCheckbox.checked = prefill.includes_stay;
+            stayCheckbox.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+
+        setField("number_of_pets", prefill.number_of_pets);
+
+        (prefill.grooming_services || []).forEach(function (service) {
+            const checkbox = document.querySelector(
+                `input[name="grooming_services"][value="${service}"]`
+            );
+
+            if (checkbox && !checkbox.checked) {
+                checkbox.checked = true;
+                checkbox.dispatchEvent(new Event("change", { bubbles: true }));
+            }
+        });
+
+        // Dates first: changing a date refreshes which times can be picked.
+        ["check_in_date", "check_out_date", "grooming_date"].forEach(function (name) {
+            setField(name, prefill[name]);
+        });
+
+        ["drop_off_time", "pickup_time", "grooming_time"].forEach(function (name) {
+            setField(name, prefill[name]);
+        });
+
+        addMessage(
+            "Pawket Assistant",
+            "I've filled in the booking form below. Add your details and your dogs' " +
+            "information, check everything, and then select Review Booking."
+        );
+
+        const firstEmpty = document.querySelector(
+            'form [name="owner_name"]'
+        );
+
+        if (firstEmpty) {
+            firstEmpty.scrollIntoView({ behavior: "smooth", block: "center" });
+        }
+    }
+
+    // Display an assistant response, with a button to fill in the form when it prepared a booking.
     function displayAssistantResponse(response) {
         const messageDiv = addMessage(
             "Pawket Assistant",
             response.message
         );
+
+        if (response.booking) {
+            const bookingButton = document.createElement("button");
+            bookingButton.type = "button";
+            bookingButton.className = "btn btn-pawket btn-sm mt-2";
+            bookingButton.textContent = `Fill in the booking form: ${response.booking.label}`;
+
+            messageDiv.appendChild(bookingButton);
+
+            bookingButton.addEventListener("click", function () {
+                applyBooking(response.booking.prefill);
+
+                bookingButton.disabled = true;
+                bookingButton.textContent = "Booking form filled in";
+            });
+        }
 
         if (!response.recommendations) {
             return;
@@ -139,7 +214,8 @@ document.addEventListener("DOMContentLoaded", function () {
             message:
                 "Sorry, something went wrong. You can send your " +
                 "question to our team on the Contact Us page.",
-            recommendations: null
+            recommendations: null,
+            booking: null
         };
 
         try {
@@ -156,7 +232,8 @@ document.addEventListener("DOMContentLoaded", function () {
             if (data.reply) {
                 response = {
                     message: data.reply,
-                    recommendations: data.recommendations
+                    recommendations: data.recommendations,
+                    booking: data.booking
                 };
             }
         } catch (error) {

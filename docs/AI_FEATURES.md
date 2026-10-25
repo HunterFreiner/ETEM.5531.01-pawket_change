@@ -2,8 +2,8 @@
 
 Pawket Change uses Claude (Claude Haiku 5.5, made by Anthropic) for:
 
-- **Contact page assistant:** answers questions about services, prices, and hours, checks open time slots, and gives a "Review this booking" button that fills in the booking form. It never books by itself. Customers can send the chat to the team with one button.
-- **Book a Stay assistant:** on the booking page, the assistant recommends a stay and grooming services based on the dog's needs. **Apply Recommendations** ticks them on the form without removing anything the customer already picked.
+- **Contact page assistant:** answers questions about services, prices, and hours, and checks open time slots. When a customer describes what they want (a stay, grooming, or both, with dates, times, and number of dogs), it gives a "Review this booking" button that opens the booking form filled in. It never books by itself. Customers can send the chat to the team with one button.
+- **Book Now assistant:** on the booking page, the assistant recommends a stay and grooming services based on the dog's needs. **Apply Recommendations** ticks them on the form without removing anything the customer already picked. Once the customer gives dates and times, **Fill in the booking form** fills in the stay or grooming appointment, services, and number of dogs on the page, without reloading it.
 - **Contact message tags:** every Contact Us message, and every chat sent to the team, gets a category and a priority in the Django admin.
 - **Review moderation:** reviews with spam, abuse, or private details are held as *pending* until staff publish them. Negative reviews are never held for being negative.
 - **Review summary:** a short "What guests are saying" summary on the Reviews page once there are at least 3 published reviews. It's only rewritten after reviews change.
@@ -31,6 +31,16 @@ Optional settings:
 | `PAWKET_AI_MODEL` | `claude-haiku-5-5` | Which Claude model to use |
 | `PAWKET_AI_ENABLED` | `true` | Set to `false` to turn AI off without removing the key |
 
+## Live check of the AI's answers
+
+The tests use a fake Claude, so they can't show whether the real AI's answers are any good. Once your API key is set, run:
+
+```
+python manage.py check_ai_answers
+```
+
+It asks the assistant about 20 questions: common ones (prices, hours, policies), traps the facts don't cover (discounts, cats, a 9 PM pickup, vaccine rules, late fees, an off-topic request), an available and a taken time slot, and two booking requests. Each answer is checked by a second Claude call against the business facts, and the booking requests are also checked exactly against what the booking form expects. It also checks the review summary. It prints PASS or FAIL with the answer and the reason, costs a few cents, and leaves the database as it was. Run it again after changing prompts in `ai.py` or any prices.
+
 ## Developer notes
 
 - Install dependencies with `pip install -r requirements.txt`, then run `python manage.py migrate`.
@@ -47,15 +57,18 @@ Run with the API key set. Record the tester's name, date, browser/device, and an
 - [ ] The Contact page shows **Ask our assistant** and a notice that it's AI and that messages are sent to Anthropic.
 - [ ] Asking "How much is an overnight stay?" gives **$45 a night**.
 - [ ] Asking something it can't know (for example "Do you take cats?") gets an honest "not sure" and points to sending the chat to the team.
-- [ ] Asking for a stay with dates and times (for example "Can I drop off tomorrow at 10am and pick up the day after at 3pm?") shows a **Review this booking** button. It opens Book a Stay with the dates and times filled in, and nothing is booked until you confirm.
+- [ ] Asking for a stay with dates and times (for example "Can I drop off tomorrow at 10am and pick up the day after at 3pm?") shows a **Review this booking** button. It opens Book Now with the dates and times filled in, and nothing is booked until you confirm.
 - [ ] Asking for a time that's already booked or outside 8 AM – 6 PM gets told it isn't available.
 - [ ] **Send this conversation to our team** asks for name and email. A bad email shows an error. A good one shows a thank-you, and the message appears in the admin with the chat transcript.
 - [ ] Off-topic requests (for example "Write me a poem about cars") are politely declined.
 - [ ] The chat works with a keyboard and at phone width.
 
-### Book a Stay assistant
+### Book Now assistant
 
-- [ ] The Book a Stay page shows **Pawket Change Assistant** with the AI and Anthropic notice.
+- [ ] The Book Now page shows **Pawket Change Assistant** with the AI and Anthropic notice.
+- [ ] Saying "Board my 2 dogs from [date] at 9am to [date] at 4pm, with a bath" shows **Fill in the booking form**. It fills in the dates, times, Bath, and 2 dogs, and keeps anything you'd already typed. The estimate shows 2 dogs.
+- [ ] Saying "Just a haircut on [date] at 2pm, no stay" fills in a grooming-only appointment.
+- [ ] Every filled-in field can still be changed, and nothing is booked until you select **Review Booking** and then **Submit Booking**.
 - [ ] Saying "My dog's coat is matted and long" recommends grooming such as a haircut or deshedding, with prices, and shows **Apply Recommendations**.
 - [ ] **Apply Recommendations** ticks those boxes on the form, keeps any boxes already ticked, and updates the price estimate.
 

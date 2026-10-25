@@ -260,6 +260,28 @@ b,
     font-size: 0.9rem;
 }
 
+/* Booking form: one card per dog */
+.pet-card {
+    border: 1px solid var(--rule);
+    border-radius: 0.75rem;
+    background-color: var(--cream);
+}
+
+.pet-care-details summary {
+    color: var(--teal);
+    font-weight: 500;
+    cursor: pointer;
+}
+
+.pet-summary + .pet-summary {
+    border-top: 1px solid var(--rule);
+}
+
+.pet-summary-label {
+    color: var(--teal);
+    font-weight: 500;
+}
+
 /* AI features: Contact page chat, review summary, and owner replies. */
 .chat-notice {
     color: #625e55;

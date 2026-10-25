@@ -1,3 +1,4 @@
+import re
 from collections import defaultdict
 from datetime import datetime, timedelta
 
@@ -7,8 +8,8 @@ from django.utils import timezone
 
 from .models import (
     Booking, BUSINESS_HOURS, CLOSING_TIME, ContactMessage,
-    GROOMING_PRICES, GROOMING_SERVICES, MAX_STAY_NIGHTS,
-    OPENING_TIME, Review, SLOT_MINUTES,
+    GROOMING_PRICES, GROOMING_SERVICES, MAX_PETS, MAX_STAY_NIGHTS,
+    OPENING_TIME, Pet, Review, SLOT_MINUTES,
 )
 
 
@@ -24,11 +25,14 @@ def time_slots():
 
 
 def booked_slots():
+    """Times already taken on each upcoming date by a drop-off, pickup, or grooming-only appointment,
+    e.g. {'2026-10-20': ['08:00', '14:15']}."""
     slots = defaultdict(set)
+    today = timezone.localdate()
 
     for booking in Booking.objects.filter(
         includes_stay=True,
-        check_out_date__gte=timezone.localdate(),
+        check_out_date__gte=today,
         check_in_date__isnull=False,
         drop_off_time__isnull=False,
         pickup_time__isnull=False,
@@ -40,14 +44,24 @@ def booked_slots():
             booking.pickup_time.strftime('%H:%M')
         )
 
+    for booking in Booking.objects.filter(
+        includes_stay=False,
+        grooming_date__gte=today,
+        grooming_time__isnull=False,
+    ):
+        slots[booking.grooming_date.isoformat()].add(
+            booking.grooming_time.strftime('%H:%M')
+        )
+
     return {day: sorted(times) for day, times in slots.items()}
 
 
 def slot_is_booked(day, time):
+    """Each time slot on a given day holds one drop-off, pickup, or grooming-only appointment."""
     return Booking.objects.filter(
-        Q(check_in_date=day, drop_off_time=time) |
-        Q(check_out_date=day, pickup_time=time),
-        includes_stay=True,
+        Q(includes_stay=True, check_in_date=day, drop_off_time=time) |
+        Q(includes_stay=True, check_out_date=day, pickup_time=time) |
+        Q(includes_stay=False, grooming_date=day, grooming_time=time)
     ).exists()
 
 
@@ -66,7 +80,11 @@ class BookingForm(forms.ModelForm):
     class Meta:
         model = Booking
         fields = [
+            'owner_name',
             'email',
+            'phone',
+            'number_of_pets',
+            'notes',
             'includes_stay',
             'grooming_services',
             'check_in_date',
@@ -77,7 +95,11 @@ class BookingForm(forms.ModelForm):
             'grooming_time',
         ]
         labels = {
+            'owner_name': 'Your name',
             'email': 'Email address',
+            'phone': 'Phone number',
+            'number_of_pets': 'Number of dogs',
+            'notes': 'Notes or requests (optional)',
             'includes_stay': 'Include daycare or overnight stay',
             'check_in_date': 'Check-in / drop-off date',
             'drop_off_time': 'Drop-off time',
@@ -86,10 +108,22 @@ class BookingForm(forms.ModelForm):
             'grooming_date': 'Preferred grooming date',
             'grooming_time': 'Preferred grooming time',
         }
+        help_texts = {
+            'email': 'Use this email later to leave a review.',
+            'phone': 'So we can reach you while your dog is with us.',
+            'number_of_pets': f'Up to {MAX_PETS} dogs per booking. Prices are per dog.',
+        }
         widgets = {
+            'owner_name': forms.TextInput(attrs={'autocomplete': 'name', 'placeholder': 'e.g. Dez Calloway'}),
             'email': forms.EmailInput(attrs={
                 'autocomplete': 'email',
                 'placeholder': 'you@example.com',
+            }),
+            'phone': forms.TextInput(attrs={'type': 'tel', 'autocomplete': 'tel', 'placeholder': '314-555-0142'}),
+            'number_of_pets': forms.Select(choices=[(n, n) for n in range(1, MAX_PETS + 1)]),
+            'notes': forms.Textarea(attrs={
+                'rows': 3,
+                'placeholder': 'Anything else we should know, like a preferred pickup person or a request for photo updates',
             }),
             'includes_stay': forms.CheckboxInput(),
             'check_in_date': forms.DateInput(
@@ -131,7 +165,13 @@ class BookingForm(forms.ModelForm):
 
         # New bookings default to a stay, like the original form.
         if not self.is_bound and self.instance.pk is None:
-            self.initial['includes_stay'] = True
+            self.initial.setdefault('includes_stay', True)
+
+    def clean_phone(self):
+        phone = self.cleaned_data['phone'].strip()
+        if len(re.sub(r'\D', '', phone)) < 10:
+            raise forms.ValidationError('Please enter a phone number with area code, e.g. 314-555-0142.')
+        return phone
 
     def clean(self):
         cleaned = super().clean()
@@ -274,8 +314,52 @@ class BookingForm(forms.ModelForm):
                     'That appointment time has already passed.'
                 )
 
+            if (
+                grooming_date
+                and grooming_time
+                and slot_is_booked(grooming_date, grooming_time)
+            ):
+                self.add_error(
+                    'grooming_time',
+                    'That grooming time is already booked. Please choose another time.'
+                )
+
         return cleaned
 
+
+
+class PetForm(forms.ModelForm):
+    class Meta:
+        model = Pet
+        fields = ['name', 'breed', 'size', 'age', 'special_instructions', 'medications', 'dietary_needs']
+        labels = {
+            'name': "Dog's name",
+            'breed': 'Breed',
+            'size': 'Size',
+            'age': 'Age (years)',
+            'special_instructions': 'Special care instructions (optional)',
+            'medications': 'Medications (optional)',
+            'dietary_needs': 'Dietary needs (optional)',
+        }
+        help_texts = {'age': 'Enter 0 for puppies under 1 year.'}
+        widgets = {
+            'name': forms.TextInput(attrs={'placeholder': 'e.g. Biscuit'}),
+            'breed': forms.TextInput(attrs={'placeholder': 'e.g. Golden retriever, or mixed breed'}),
+            'size': forms.Select(choices=[('', 'Select a size')] + Pet.SIZE_CHOICES),
+            'age': forms.NumberInput(attrs={'min': 0, 'max': 30}),
+            'special_instructions': forms.Textarea(attrs={
+                'rows': 2, 'placeholder': 'e.g. Nervous around large dogs, needs a slow introduction',
+            }),
+            'medications': forms.Textarea(attrs={'rows': 2, 'placeholder': 'Name, dose, and when to give it'}),
+            'dietary_needs': forms.Textarea(attrs={
+                'rows': 2, 'placeholder': 'e.g. Grain-free food twice a day, which you will bring',
+            }),
+        }
+
+
+def pet_forms(data=None):
+    """One form per possible dog. Only the first number_of_pets are shown, checked, and saved."""
+    return [PetForm(data, prefix=f'pet{i}') for i in range(MAX_PETS)]
 
 
 class ContactForm(forms.ModelForm):

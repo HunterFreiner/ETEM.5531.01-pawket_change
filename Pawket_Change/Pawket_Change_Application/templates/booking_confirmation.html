@@ -16,9 +16,19 @@
     <section class="mission mx-auto mt-4 p-4 text-start">
 
         <p>
-            Your booking request has been received for
-            <strong>{{ booking.email }}</strong>.
+            Thanks, {{ booking.owner_name }}! Your booking request has been received for
+            <strong>{{ booking.email }}</strong>. If we need to reach you, we'll call
+            <strong>{{ booking.phone }}</strong>.
         </p>
+
+        <h3 class="page-title h5 mt-4">{{ booking.number_of_pets }} Dog{{ booking.number_of_pets|pluralize }}</h3>
+
+        {% include 'booking_pets.html' with pets=booking.pets.all %}
+
+        {% if booking.notes %}
+            <h3 class="page-title h5 mt-4">Notes or Requests</h3>
+            <p>{{ booking.notes|linebreaksbr }}</p>
+        {% endif %}
 
         {% if booking.includes_stay %}
             <h3 class="page-title h5 mt-4">Stay Details</h3>
@@ -66,14 +76,14 @@
 
         {% if booking.includes_stay %}
             <div class="d-flex justify-content-between py-2">
-                <span>Stay cost</span>
+                <span>Stay cost{% if booking.number_of_pets > 1 %} <span class="small text-muted">({{ booking.number_of_pets }} dogs × ${{ booking.stay_cost_per_pet }})</span>{% endif %}</span>
                 <span>${{ booking.cost }}</span>
             </div>
         {% endif %}
 
         {% if booking.grooming_services %}
             <div class="d-flex justify-content-between py-2">
-                <span>Grooming cost</span>
+                <span>Grooming cost{% if booking.number_of_pets > 1 %} <span class="small text-muted">({{ booking.number_of_pets }} dogs × ${{ booking.grooming_cost_per_pet }})</span>{% endif %}</span>
                 <span>${{ booking.grooming_cost }}</span>
             </div>
         {% endif %}

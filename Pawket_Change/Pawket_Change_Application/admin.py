@@ -1,12 +1,19 @@
 from django.contrib import admin, messages
 
 from . import ai
-from .models import Booking, ContactMessage, Review, ReviewSummary
+from .models import Booking, ContactMessage, Pet, Review, ReviewSummary
+
+
+class PetInline(admin.StackedInline):
+    model = Pet
+    extra = 0
 
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ['email', 'check_in_date', 'drop_off_time', 'check_out_date', 'pickup_time', 'created_at']
+    list_display = ['owner_name', 'email', 'phone', 'number_of_pets', 'check_in_date', 'grooming_date', 'created_at']
+    search_fields = ['owner_name', 'email', 'phone', 'pets__name']
+    inlines = [PetInline]
 
 
 @admin.register(ContactMessage)

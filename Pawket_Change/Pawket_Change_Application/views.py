@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 from django.conf import settings
 from django.contrib import messages
-from django.db import DatabaseError
+from django.db import DatabaseError, transaction
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404, redirect, render
 from django.http import HttpResponse, JsonResponse
@@ -14,10 +14,11 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import ai
-from .forms import BookingForm, ContactForm, ReviewEmailForm, ReviewForm, booked_slots
+from .forms import BookingForm, ContactForm, ReviewEmailForm, ReviewForm, booked_slots, pet_forms
 from .models import (
-    ADD_ONS, BUSINESS_HOURS, FULL_DAY_PRICE, GROOMING_PRICES, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE, OVERNIGHT_PRICE,
-    PRICING_POLICIES, SERVICES, Booking, ContactMessage, Review,
+    ADD_ONS, BUSINESS_HOURS, FULL_DAY_PRICE, GROOMING_PRICES, GROOMING_SERVICES, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE,
+    OVERNIGHT_PRICE,
+    MAX_PETS, PRICING_POLICIES, SERVICES, Booking, ContactMessage, Review,
 )
 
 # Limits for the Contact page chat, so one visitor can't run up the API bill.
@@ -42,6 +43,7 @@ def services(request):
 
     context = {
         'services': SERVICES,
+        'grooming': [{'name': name, 'price': f'${GROOMING_PRICES[code]}'} for code, name in GROOMING_SERVICES],
         'add_ons': ADD_ONS,
         'policies': PRICING_POLICIES,
     }
@@ -283,27 +285,41 @@ def reviews(request):
 def book(request):
     if request.method == 'POST':
         form = BookingForm(request.POST)
+        pets = pet_forms(request.POST)
         action = request.POST.get('action')
 
-        if form.is_valid() and action != 'edit':
-            if action == 'confirm':
-                booking = form.save()
+        if action != 'edit':
+            booking_is_valid = form.is_valid()
+            active_pets = pets[:form.cleaned_data.get('number_of_pets') or 1]
+            # Check every shown dog's form, not just until the first error, so all problems show at once.
+            pets_are_valid = all([pet_form.is_valid() for pet_form in active_pets])
 
-                return redirect(
-                    'booking_confirmation',
-                    booking_id=booking.id,
+            if booking_is_valid and pets_are_valid:
+                if action == 'confirm':
+                    with transaction.atomic():
+                        booking = form.save()
+                        for pet_form in active_pets:
+                            pet_form.instance.booking = booking
+                            pet_form.save()
+
+                    return redirect(
+                        'booking_confirmation',
+                        booking_id=booking.id,
+                    )
+
+                return render(
+                    request,
+                    'booking_review.html',
+                    {
+                        'form': form,
+                        'pet_forms': pets,
+                        'booking': form.instance,
+                        'pets': [pet_form.instance for pet_form in active_pets],
+                    },
                 )
-
-            return render(
-                request,
-                'booking_review.html',
-                {
-                    'form': form,
-                    'booking': form.instance,
-                },
-            )
     else:
         form = BookingForm(initial=_booking_prefill(request.GET))
+        pets = pet_forms()
     now = timezone.localtime()
 
     availability = {
@@ -315,6 +331,7 @@ def book(request):
     # Pricing information for the live booking estimate
     context = {
         'form': form,
+        'pet_forms': pets,
         'business_hours': BUSINESS_HOURS,
         'availability': availability,
         'ai_enabled': ai.is_enabled(),
@@ -331,14 +348,22 @@ def book(request):
 
 
 def _booking_prefill(params):
-    """Booking details from a chat assistant link. Badly formatted values are dropped; the form checks the rest on submit."""
+    """Booking details from a link, such as the chat assistant's or the Services page's grooming button.
+    Badly formatted values are dropped; the form checks the rest on submit."""
     prefill = {}
-    for field in ('check_in_date', 'check_out_date'):
+    if params.get('includes_stay') == 'false':
+        prefill['includes_stay'] = False
+    if params.get('number_of_pets') in [str(n) for n in range(1, MAX_PETS + 1)]:
+        prefill['number_of_pets'] = int(params['number_of_pets'])
+    grooming = [code for code in params.getlist('grooming_services') if code in GROOMING_PRICES]
+    if grooming:
+        prefill['grooming_services'] = grooming
+    for field in ('check_in_date', 'check_out_date', 'grooming_date'):
         try:
             prefill[field] = date.fromisoformat(params.get(field, ''))
         except ValueError:
             pass
-    for field in ('drop_off_time', 'pickup_time'):
+    for field in ('drop_off_time', 'pickup_time', 'grooming_time'):
         try:
             prefill[field] = datetime.strptime(params.get(field, ''), '%H:%M').strftime('%H:%M')
         except ValueError:

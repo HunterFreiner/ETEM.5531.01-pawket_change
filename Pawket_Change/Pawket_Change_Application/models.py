@@ -19,6 +19,9 @@ HALF_DAY_MAX_HOURS = 4
 OVERNIGHT_PRICE = 45
 BUSINESS_HOURS = 'Monday–Sunday, 8:00 AM – 6:00 PM'
 
+# Each booking covers 1 to MAX_PETS dogs, and every price is per dog.
+MAX_PETS = 3
+
 GROOMING_SERVICES = [
     ('bath', 'Bath'),
     ('haircut', 'Haircut'),
@@ -35,16 +38,14 @@ GROOMING_PRICES = {
     'ear_cleaning': 10,
 }
 
-# The Services page and the AI assistant both read these, so the assistant always quotes the real prices.
+# The Services page, the booking form, and the AI assistant all read these lists, so every page quotes the same prices.
 SERVICES = [
     {'name': 'Full-Day Daycare', 'price': f'${FULL_DAY_PRICE}', 'unit': '/day', 'included': 'Supervised playtime, rest periods, and general care'},
     {'name': 'Half-Day Daycare', 'price': f'${HALF_DAY_PRICE}', 'unit': '/day', 'included': f'Up to {HALF_DAY_MAX_HOURS} hours of supervised care'},
     {'name': 'Overnight Boarding', 'price': f'${OVERNIGHT_PRICE}', 'unit': '/night', 'included': 'Overnight care, feeding, and daily activities'},
-    {'name': 'Basic Grooming', 'price': '$30', 'unit': '', 'included': 'Bath, brushing, and basic cleaning'},
 ]
 ADD_ONS = [
     {'name': 'Extra Walk (20 minutes)', 'price': '$10'},
-    {'name': 'Nail Trimming', 'price': '$12'},
     {'name': 'One-on-One Playtime', 'price': '$8'},
 ]
 PRICING_POLICIES = [
@@ -57,7 +58,13 @@ PRICING_POLICIES = [
 
 
 class Booking(models.Model):
+    owner_name = models.CharField(max_length=100, default='')
     email = models.EmailField()
+    phone = models.CharField(max_length=20, default='')
+    number_of_pets = models.PositiveSmallIntegerField(
+        default=1, validators=[MinValueValidator(1), MaxValueValidator(MAX_PETS)],
+    )
+    notes = models.TextField(max_length=1000, blank=True)
 
     # Whether the customer is booking a stay
     includes_stay = models.BooleanField(default=True)
@@ -108,11 +115,8 @@ class Booking(models.Model):
         ]
 
     @property
-    def cost(self):
-        """
-        Calculate stay cost using existing pricing.
-        Grooming pricing will be added separately.
-        """
+    def stay_cost_per_pet(self):
+        """Overnight stays are charged per night; same-day stays are half-day or full-day daycare."""
         if not self.includes_stay:
             return 0
 
@@ -142,15 +146,48 @@ class Booking(models.Model):
         return FULL_DAY_PRICE
 
     @property
-    def grooming_cost(self):
+    def cost(self):
+        return self.stay_cost_per_pet * self.number_of_pets
+
+    @property
+    def grooming_cost_per_pet(self):
         return sum(
             GROOMING_PRICES.get(service, 0)
             for service in self.grooming_services
         )
 
     @property
+    def grooming_cost(self):
+        return self.grooming_cost_per_pet * self.number_of_pets
+
+    @property
     def total_cost(self):
         return self.cost + self.grooming_cost
+
+
+class Pet(models.Model):
+    """A dog on a booking, with the details and care needs staff should know about."""
+    SIZE_CHOICES = [
+        ('small', 'Small (under 20 lb)'),
+        ('medium', 'Medium (20–50 lb)'),
+        ('large', 'Large (50–90 lb)'),
+        ('extra_large', 'Extra large (over 90 lb)'),
+    ]
+
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='pets')
+    name = models.CharField(max_length=50)
+    breed = models.CharField(max_length=60)
+    size = models.CharField(max_length=20, choices=SIZE_CHOICES)
+    age = models.PositiveSmallIntegerField(validators=[MaxValueValidator(30)], help_text='In years. Enter 0 for puppies under 1.')
+    special_instructions = models.TextField(max_length=1000, blank=True)
+    medications = models.TextField(max_length=1000, blank=True)
+    dietary_needs = models.TextField(max_length=1000, blank=True)
+
+    class Meta:
+        ordering = ['id']
+
+    def __str__(self):
+        return f'{self.name} ({self.breed})'
 
 
 

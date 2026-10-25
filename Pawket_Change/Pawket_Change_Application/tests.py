@@ -1,11 +1,15 @@
 import json
 from datetime import timedelta
+from io import StringIO
 from types import SimpleNamespace
 from unittest.mock import patch
 
 import anthropic
 import httpx2
+from django import forms
 from django.contrib.auth.models import User
+from django.core.management import CommandError, call_command
+from django.contrib.staticfiles import finders
 from django.db import DatabaseError
 from django.test import TestCase
 from django.test.utils import override_settings
@@ -14,12 +18,25 @@ from django.utils import timezone
 
 from . import ai
 from .forms import BookingForm, ContactForm, time_slots
-from .models import Booking, ContactMessage, Review, ReviewSummary
+from .models import Booking, ContactMessage, Pet, Review, ReviewSummary
+
+
+# The customer and dog details every booking needs.
+OWNER_AND_PET = {
+    'owner_name': 'Dez Calloway',
+    'phone': '314-555-0142',
+    'number_of_pets': '1',
+    'pet0-name': 'Biscuit',
+    'pet0-breed': 'Beagle',
+    'pet0-size': 'medium',
+    'pet0-age': '3',
+}
 
 
 def booking_data(check_in_offset=1, check_out_offset=3, drop_off='10:00', pickup='15:00'):
     today = timezone.localdate()
     return {
+        **OWNER_AND_PET,
         'email': 'guest@example.com',
         'includes_stay': 'on',
         'check_in_date': (today + timedelta(days=check_in_offset)).isoformat(),
@@ -158,6 +175,7 @@ class BookingCostTests(TestCase):
 class GroomingBookingTests(TestCase):
     def grooming_only(self, **overrides):
         data = {
+            **OWNER_AND_PET,
             'email': 'guest@example.com',
             'grooming_services': ['bath', 'nail_trimming'],
             'grooming_date': (timezone.localdate() + timedelta(days=2)).isoformat(),
@@ -173,7 +191,7 @@ class GroomingBookingTests(TestCase):
         self.assertEqual(booking.grooming_service_names, ['Bath', 'Nail trimming'])
 
     def test_booking_needs_a_stay_or_grooming(self):
-        form = BookingForm({'email': 'guest@example.com'})
+        form = BookingForm({**OWNER_AND_PET, 'email': 'guest@example.com'})
         self.assertIn('Please select a stay, grooming services, or both.', form.non_field_errors())
 
     def test_grooming_only_needs_date_and_time(self):
@@ -191,10 +209,230 @@ class GroomingBookingTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.save().total_cost, 90 + 40)
 
+    def test_grooming_time_already_booked_by_grooming_is_unavailable(self):
+        self.grooming_only().save()
+        form = self.grooming_only(grooming_services=['haircut'])
+        self.assertIn('That grooming time is already booked', ' '.join(form.errors['grooming_time']))
+
+    def test_grooming_and_drop_off_cannot_share_a_slot(self):
+        BookingForm(booking_data(check_in_offset=2, check_out_offset=4, drop_off='11:00')).save()
+        self.assertIn('grooming_time', self.grooming_only().errors)
+
+    def test_drop_off_cannot_take_a_grooming_slot(self):
+        self.grooming_only().save()
+        form = BookingForm(booking_data(check_in_offset=2, check_out_offset=4, drop_off='11:00'))
+        self.assertIn('drop_off_time', form.errors)
+
+    def test_other_grooming_times_and_dates_stay_open(self):
+        self.grooming_only().save()
+        self.assertTrue(self.grooming_only(grooming_time='11:15').is_valid())
+        other_day = (timezone.localdate() + timedelta(days=3)).isoformat()
+        self.assertTrue(self.grooming_only(grooming_date=other_day).is_valid())
+
+    def test_booking_page_lists_booked_grooming_times(self):
+        booking = self.grooming_only().save()
+        response = self.client.get(reverse('book'))
+        self.assertEqual(response.context['availability']['booked'][booking.grooming_date.isoformat()], ['11:00'])
+
     def test_stay_fields_required_when_stay_is_selected(self):
-        form = BookingForm({'email': 'guest@example.com', 'includes_stay': 'on'})
+        form = BookingForm({**OWNER_AND_PET, 'email': 'guest@example.com', 'includes_stay': 'on'})
         self.assertIn('check_in_date', form.errors)
         self.assertIn('pickup_time', form.errors)
+
+
+class GroomingStoryTests(TestCase):
+    """Acceptance criteria for "As a customer, I want to select grooming services for my pet"."""
+
+    def grooming_request(self, **overrides):
+        return {
+            **OWNER_AND_PET,
+            'email': 'guest@example.com',
+            'grooming_services': ['bath', 'nail_trimming'],
+            'grooming_date': (timezone.localdate() + timedelta(days=2)).isoformat(),
+            'grooming_time': '11:00',
+            **overrides,
+        }
+
+    def test_grooming_booking_is_reachable_from_navigation_and_services_page(self):
+        for page in ('home', 'services'):
+            self.assertContains(self.client.get(reverse(page)), f'href="{reverse("book")}"')
+        self.assertContains(self.client.get(reverse('book')), 'Grooming Services')
+
+    def test_navigation_says_book_now(self):
+        response = self.client.get(reverse('home'))
+        self.assertContains(response, f'href="{reverse("book")}">Book Now</a>')
+        self.assertNotContains(response, 'Book a Stay')
+
+    def test_services_grooming_button_opens_grooming_only_form(self):
+        url = f'{reverse("book")}?includes_stay=false'
+        self.assertContains(self.client.get(reverse('services')), f'href="{url}"')
+        form = self.client.get(url).context['form']
+        self.assertFalse(form['includes_stay'].value())
+
+    def test_booking_form_still_defaults_to_a_stay(self):
+        self.assertTrue(self.client.get(reverse('book')).context['form']['includes_stay'].value())
+
+    def test_booking_form_explains_how_to_book_grooming_only(self):
+        self.assertContains(self.client.get(reverse('book')), 'Only booking grooming? Uncheck this')
+
+    def test_all_grooming_services_can_be_selected(self):
+        response = self.client.get(reverse('book'))
+        field = response.context['form'].fields['grooming_services']
+        self.assertIsInstance(field.widget, forms.CheckboxSelectMultiple)
+        offered = [code for code, _ in field.choices]
+        for code, label in [('nail_trimming', 'Nail trimming'), ('haircut', 'Haircut'), ('bath', 'Bath'),
+                            ('deshedding', 'Brush / deshedding'), ('ear_cleaning', 'Ear cleaning')]:
+            self.assertIn(code, offered)
+            self.assertContains(response, f'value="{code}"')
+            self.assertContains(response, label)
+
+    def test_preferred_date_and_time_fields_are_offered(self):
+        response = self.client.get(reverse('book'))
+        self.assertContains(response, 'Preferred grooming date')
+        self.assertContains(response, 'Preferred grooming time')
+
+    def test_review_shows_selected_services_date_and_time(self):
+        data = self.grooming_request()
+        response = self.client.post(reverse('book'), {**data, 'action': 'review'})
+        self.assertContains(response, 'Review Your Booking')
+        self.assertContains(response, '<li>Bath</li>', html=True)
+        self.assertContains(response, '<li>Nail trimming</li>', html=True)
+        self.assertNotContains(response, '<li>Haircut</li>', html=True)
+        self.assertContains(response, '11:00 AM')
+        self.assertContains(response, '$42')
+        self.assertFalse(Booking.objects.exists())
+
+    def test_edit_keeps_selected_services(self):
+        response = self.client.post(reverse('book'), {**self.grooming_request(), 'action': 'edit'})
+        self.assertEqual(response.context['form']['grooming_services'].value(), ['bath', 'nail_trimming'])
+
+    def test_customer_can_submit_grooming_request(self):
+        data = self.grooming_request()
+        response = self.client.post(reverse('book'), {**data, 'action': 'confirm'}, follow=True)
+        booking = Booking.objects.get()
+        self.assertFalse(booking.includes_stay)
+        self.assertEqual(booking.grooming_services, ['bath', 'nail_trimming'])
+        self.assertEqual(booking.grooming_date.isoformat(), data['grooming_date'])
+        self.assertContains(response, 'Booking Request Received!')
+        self.assertContains(response, '<li>Nail trimming</li>', html=True)
+
+    def test_review_page_hidden_fields_resubmit_the_same_request(self):
+        """Submit Booking on the review page posts the form back as hidden fields."""
+        review = self.client.post(reverse('book'), {**self.grooming_request(), 'action': 'review'})
+        form = review.context['form']
+        resubmitted = {}
+        for field in [*form, *[f for pet_form in review.context['pet_forms'] for f in pet_form]]:
+            value = field.value()
+            resubmitted[field.html_name] = value if value is not None else ''
+        resubmitted['includes_stay'] = str(form['includes_stay'].value())
+        self.client.post(reverse('book'), {**resubmitted, 'action': 'confirm'})
+        self.assertEqual(Booking.objects.get().grooming_services, ['bath', 'nail_trimming'])
+
+
+class BookingDetailsStoryTests(TestCase):
+    """Acceptance criteria for "As a customer, I want additional options when booking my pet's stay"."""
+
+    def two_dogs(self, **overrides):
+        return {
+            **booking_data(),
+            'number_of_pets': '2',
+            'pet0-special_instructions': 'Nervous around big dogs',
+            'pet0-medications': 'Apoquel 16mg with breakfast',
+            'pet0-dietary_needs': 'Grain-free, we will bring food',
+            'pet1-name': 'Mochi',
+            'pet1-breed': 'Shiba Inu',
+            'pet1-size': 'small',
+            'pet1-age': '0',
+            'notes': 'Please send a photo update',
+            **overrides,
+        }
+
+    def test_form_asks_for_name_and_contact_information(self):
+        response = self.client.get(reverse('book'))
+        for label in ('Your name', 'Email address', 'Phone number'):
+            self.assertContains(response, label)
+
+    def test_name_and_phone_are_required_and_phone_is_checked(self):
+        form = BookingForm({**booking_data(), 'owner_name': '', 'phone': '555'})
+        self.assertIn('owner_name', form.errors)
+        self.assertIn('Please enter a phone number with area code', ' '.join(form.errors['phone']))
+
+    def test_form_asks_for_each_dogs_name_breed_size_and_age(self):
+        response = self.client.get(reverse('book'))
+        self.assertEqual(len(response.context['pet_forms']), 3)
+        for label in ("Dog&#x27;s name", 'Breed', 'Size', 'Age (years)', 'Number of dogs'):
+            self.assertContains(response, label)
+
+    def test_dog_details_are_required_for_each_dog_booked(self):
+        response = self.client.post(reverse('book'), {**self.two_dogs(), 'pet1-name': '', 'pet1-breed': '', 'action': 'review'})
+        self.assertContains(response, 'Book Your Pet')
+        self.assertTrue(response.context['pet_forms'][1].errors)
+        self.assertFalse(Booking.objects.exists())
+
+    def test_two_dogs_are_saved_with_breed_and_care_details(self):
+        self.client.post(reverse('book'), {**self.two_dogs(), 'pet2-name': 'Ignored', 'action': 'confirm'})
+        booking = Booking.objects.get()
+        self.assertEqual(booking.number_of_pets, 2)
+        biscuit, mochi = booking.pets.all()
+        self.assertEqual((biscuit.name, biscuit.breed, biscuit.size, biscuit.age), ('Biscuit', 'Beagle', 'medium', 3))
+        self.assertEqual(biscuit.special_instructions, 'Nervous around big dogs')
+        self.assertEqual(biscuit.medications, 'Apoquel 16mg with breakfast')
+        self.assertEqual(biscuit.dietary_needs, 'Grain-free, we will bring food')
+        self.assertEqual((mochi.name, mochi.breed, mochi.age), ('Mochi', 'Shiba Inu', 0))
+        self.assertEqual(booking.notes, 'Please send a photo update')
+        self.assertFalse(Pet.objects.filter(name='Ignored').exists())
+
+    def test_care_details_and_notes_are_optional(self):
+        self.client.post(reverse('book'), {**booking_data(), 'action': 'confirm'})
+        pet = Booking.objects.get().pets.get()
+        self.assertEqual((pet.special_instructions, pet.medications, pet.dietary_needs), ('', '', ''))
+
+    def test_prices_are_per_dog(self):
+        form = BookingForm({**self.two_dogs(), 'grooming_services': ['bath']})
+        self.assertTrue(form.is_valid(), form.errors)
+        booking = form.instance
+        self.assertEqual((booking.cost, booking.grooming_cost, booking.total_cost), (180, 60, 240))
+
+    def test_review_shows_all_booking_information_before_saving(self):
+        response = self.client.post(reverse('book'), {**self.two_dogs(), 'action': 'review'})
+        for text in ('Dez Calloway', 'guest@example.com', '314-555-0142', '2 Dogs', 'Biscuit', 'Beagle',
+                     'Medium (20–50 lb)', '3 years', 'Mochi', 'Under 1 year', 'Nervous around big dogs',
+                     'Apoquel 16mg with breakfast', 'Grain-free, we will bring food', 'Please send a photo update',
+                     '2 dogs × $90', '$180'):
+            self.assertContains(response, text)
+        self.assertFalse(Booking.objects.exists())
+
+    def test_edit_keeps_dog_details(self):
+        response = self.client.post(reverse('book'), {**self.two_dogs(), 'action': 'edit'})
+        self.assertEqual(response.context['pet_forms'][1]['name'].value(), 'Mochi')
+        self.assertEqual(response.context['form']['notes'].value(), 'Please send a photo update')
+
+    def test_confirmation_shows_submitted_request(self):
+        response = self.client.post(reverse('book'), {**self.two_dogs(), 'action': 'confirm'}, follow=True)
+        self.assertContains(response, 'Booking Request Received!')
+        for text in ('Thanks, Dez Calloway!', '314-555-0142', 'Biscuit', 'Mochi', 'Apoquel 16mg with breakfast',
+                     'Please send a photo update', '<strong>$180</strong>'):
+            self.assertContains(response, text)
+
+    def test_staff_see_dogs_in_admin(self):
+        self.client.post(reverse('book'), {**self.two_dogs(), 'action': 'confirm'})
+        User.objects.create_superuser('staff', 'staff@example.com', 'pw')
+        self.client.login(username='staff', password='pw')
+        response = self.client.get(f'/admin/Pawket_Change_Application/booking/{Booking.objects.get().pk}/change/')
+        self.assertContains(response, 'Apoquel 16mg with breakfast')
+        self.assertContains(response, 'Mochi')
+
+
+class ServicesPageTests(TestCase):
+    def test_grooming_menu_matches_booking_form_prices(self):
+        response = self.client.get(reverse('services'))
+        self.assertContains(response, 'Grooming menu')
+        for name, price in [('Bath', '$30'), ('Haircut', '$40'), ('Nail trimming', '$12'),
+                            ('Brush / deshedding', '$20'), ('Ear cleaning', '$10')]:
+            self.assertContains(response, f'<span>{name}</span>', html=True)
+            self.assertContains(response, f'<span class="fw-bold">{price}</span>', html=True)
+        self.assertNotContains(response, 'Basic Grooming')
+        self.assertNotContains(response, 'Nail Trimming')
 
 
 class ContactFormTests(TestCase):
@@ -405,6 +643,33 @@ REFUSAL = SimpleNamespace(stop_reason='refusal', content=[], parsed_output=None)
 CONNECTION_ERROR = anthropic.APIConnectionError(request=httpx2.Request('POST', 'https://api.anthropic.com/v1/messages'))
 
 
+def stay_request(**overrides):
+    """A prepare_booking tool input for a two-night stay for one dog, like the assistant would send."""
+    today = timezone.localdate()
+    return {
+        'includes_stay': True,
+        'check_in_date': (today + timedelta(days=1)).isoformat(),
+        'drop_off_time': '10:00',
+        'check_out_date': (today + timedelta(days=3)).isoformat(),
+        'pickup_time': '15:00',
+        'grooming_services': [],
+        'grooming_date': '',
+        'grooming_time': '',
+        'number_of_pets': 1,
+        **overrides,
+    }
+
+
+def grooming_request(**overrides):
+    """A prepare_booking tool input for a grooming-only appointment."""
+    return stay_request(
+        includes_stay=False, check_in_date='', drop_off_time='', check_out_date='', pickup_time='',
+        grooming_services=['bath', 'nail_trimming'],
+        grooming_date=(timezone.localdate() + timedelta(days=2)).isoformat(), grooming_time='11:00',
+        **overrides,
+    )
+
+
 @override_settings(PAWKET_AI_ENABLED=True)
 class AITestCase(TestCase):
     def setUp(self):
@@ -520,11 +785,10 @@ class ContactChatTests(AITestCase):
         self.assertEqual(self.ask().status_code, 429)
         self.assertEqual(self.claude.messages.create.call_count, 20)
 
-    def test_suggest_booking_returns_prefilled_booking_link(self):
-        details = booking_data()
-        del details['email']
+    def test_prepare_booking_returns_prefilled_booking_link(self):
+        details = stay_request()
         self.claude.messages.create.side_effect = [
-            tool_use_response('suggest_booking', details),
+            tool_use_response('prepare_booking', details),
             text_response('Here is your stay. Use the button to review it.'),
         ]
         data = self.ask('Book me in').json()
@@ -534,15 +798,14 @@ class ContactChatTests(AITestCase):
         self.assertFalse(Booking.objects.exists())
         tool_result = self.claude.messages.create.call_args.kwargs['messages'][-1]['content'][0]
         self.assertEqual(tool_result['tool_use_id'], 'toolu_1')
-        self.assertIn('total $90', tool_result['content'])
+        self.assertIn('$90', tool_result['content'])
 
-    def test_suggest_booking_reports_problems_without_link(self):
-        result, booking = ai._suggest_booking({
-            'check_in_date': (timezone.localdate() - timedelta(days=1)).isoformat(),
-            'drop_off_time': '10:00',
-            'check_out_date': timezone.localdate().isoformat(),
-            'pickup_time': '19:00',
-        })
+    def test_prepare_booking_reports_problems_without_link(self):
+        result, booking = ai._prepare_booking(stay_request(
+            check_in_date=(timezone.localdate() - timedelta(days=1)).isoformat(),
+            check_out_date=timezone.localdate().isoformat(),
+            pickup_time='19:00',
+        ))
         self.assertIsNone(booking)
         self.assertIn('Not bookable', result)
         self.assertIn('check_in_date', result)
@@ -587,7 +850,7 @@ class BookingChatTests(AITestCase):
         self.assertEqual(data['reply'], 'A haircut ($40) and deshedding ($20) would help.')
         kwargs = self.claude.messages.create.call_args.kwargs
         self.assertIn('recommend_services', [tool['name'] for tool in kwargs['tools']])
-        self.assertIn('Book a Stay page', kwargs['system'][0]['text'])
+        self.assertIn('Book Now page', kwargs['system'][0]['text'])
         self.assertIn('Haircut (haircut): $40', kwargs['system'][0]['text'])
 
     def test_unknown_or_empty_recommendations_are_dropped(self):
@@ -609,6 +872,152 @@ class BookingChatTests(AITestCase):
         data = self.ask().json()
         self.assertIn('Contact Us page', data['reply'])
         self.assertIsNone(data['recommendations'])
+
+
+class AIBookingStoryTests(AITestCase):
+    """Acceptance criteria for "As a potential customer, I want to interact with an AI-powered assistant"."""
+
+    def chat(self, url_name, tool_input):
+        self.claude.messages.create.side_effect = [
+            tool_use_response('prepare_booking', tool_input),
+            text_response('Done. Use the button to fill in the form.'),
+        ]
+        return self.client.post(
+            reverse(url_name), json.dumps({'messages': [{'role': 'user', 'content': 'Book it'}]}),
+            content_type='application/json',
+        ).json()
+
+    def test_review_summary_synthesizes_reviews(self):
+        self.claude.messages.create.return_value = text_response('Guests praise the clear pricing and caring staff.')
+        response = self.client.get(reverse('reviews'))
+        self.assertContains(response, 'What guests are saying')
+        self.assertContains(response, 'Summarized by AI')
+        sent = self.claude.messages.create.call_args.kwargs['messages'][0]['content']
+        self.assertIn('Clear pricing and no surprise fees', sent)
+
+    def test_chat_is_offered_on_contact_and_booking_pages(self):
+        self.assertContains(self.client.get(reverse('contact')), 'Ask our assistant')
+        self.assertContains(self.client.get(reverse('book')), 'Pawket Change Assistant')
+
+    def test_assistant_answers_from_real_business_facts(self):
+        self.claude.messages.create.return_value = text_response('OK')
+        self.client.post(
+            reverse('contact_chat'), json.dumps({'messages': [{'role': 'user', 'content': 'Prices?'}]}),
+            content_type='application/json',
+        )
+        prompt = self.claude.messages.create.call_args.kwargs['system'][0]['text']
+        for fact in ('Overnight Boarding: $45/night', 'Full-Day Daycare: $25/day', 'Haircut (haircut): $40',
+                     'Monday–Sunday, 8:00 AM – 6:00 PM', 'No hidden fees or mandatory add-ons.',
+                     'Answer only from the facts above', "Never promise availability, discounts, or prices that aren't listed"):
+            self.assertIn(fact, prompt)
+
+    def test_extracts_stay_with_grooming_and_several_dogs(self):
+        booking = self.chat('contact_chat', stay_request(grooming_services=['bath'], number_of_pets=2))['booking']
+        self.assertIn('2 nights', booking['label'])
+        self.assertIn('Bath', booking['label'])
+        self.assertIn('2 dogs', booking['label'])
+        self.assertIn('$240', booking['label'])
+        self.assertEqual(booking['prefill']['grooming_services'], ['bath'])
+        self.assertEqual(booking['prefill']['drop_off_time'], '10:00')
+        self.assertNotIn('grooming_date', booking['prefill'])
+
+    def test_extracts_grooming_only_appointment(self):
+        booking = self.chat('booking_chat', grooming_request())['booking']
+        self.assertEqual(booking['prefill']['includes_stay'], False)
+        self.assertEqual(booking['prefill']['grooming_time'], '11:00')
+        self.assertNotIn('check_in_date', booking['prefill'])
+        self.assertIn('at 11:00 AM', booking['label'])
+        self.assertIn('$42', booking['label'])
+
+    def test_unavailable_slot_is_not_offered(self):
+        BookingForm({**OWNER_AND_PET, 'email': 'other@example.com', 'grooming_services': ['haircut'],
+                     'grooming_date': grooming_request()['grooming_date'], 'grooming_time': '11:00'}).save()
+        self.assertIsNone(self.chat('contact_chat', grooming_request())['booking'])
+        tool_result = self.claude.messages.create.call_args.kwargs['messages'][-1]['content'][0]['content']
+        self.assertIn('already booked', tool_result)
+
+    def test_link_prefills_stay_booking_form(self):
+        url = self.chat('contact_chat', stay_request(grooming_services=['haircut'], number_of_pets=2))['booking']['url']
+        form = self.client.get(url).context['form']
+        self.assertTrue(form['includes_stay'].value())
+        self.assertEqual(form['drop_off_time'].value(), '10:00')
+        self.assertEqual(form['grooming_services'].value(), ['haircut'])
+        self.assertEqual(form['number_of_pets'].value(), 2)
+
+    def test_link_prefills_grooming_only_booking_form(self):
+        details = grooming_request()
+        url = self.chat('contact_chat', details)['booking']['url']
+        form = self.client.get(url).context['form']
+        self.assertFalse(form['includes_stay'].value())
+        self.assertEqual(form['grooming_date'].value().isoformat(), details['grooming_date'])
+        self.assertEqual(form['grooming_time'].value(), '11:00')
+        self.assertEqual(form['grooming_services'].value(), ['bath', 'nail_trimming'])
+
+    def test_booking_page_fills_form_in_place(self):
+        booking = self.chat('booking_chat', stay_request())['booking']
+        self.assertIn('prefill', booking)
+        with open(finders.find('js/chatbot.js')) as script:
+            content = script.read()
+        self.assertIn('Fill in the booking form', content)
+        self.assertIn('applyBooking(response.booking.prefill)', content)
+
+    def test_prefilled_form_is_editable_and_reviewed_before_submitting(self):
+        details = stay_request()
+        url = self.chat('contact_chat', details)['booking']['url']
+        self.assertEqual(self.client.get(url).status_code, 200)
+        self.assertFalse(Booking.objects.exists())
+        edited = {**booking_data(check_out_offset=4), 'action': 'review'}
+        response = self.client.post(reverse('book'), edited)
+        self.assertContains(response, 'Review Your Booking')
+        self.assertContains(response, '3 nights')
+        self.assertFalse(Booking.objects.exists())
+
+    def test_prices_in_booking_come_from_server_not_ai(self):
+        booking = self.chat('contact_chat', stay_request(number_of_pets=3))['booking']
+        self.assertIn('$270', booking['label'])
+
+    def test_unknown_grooming_codes_in_links_are_ignored(self):
+        form = self.client.get(reverse('book'), {'grooming_services': ['bath', 'spa_day']}).context['form']
+        self.assertEqual(form['grooming_services'].value(), ['bath'])
+
+
+class LiveCheckCommandTests(AITestCase):
+    """The check_ai_answers command, run here against a fake Claude so it costs nothing."""
+
+    def run_command(self):
+        out = StringIO()
+        try:
+            call_command('check_ai_answers', stdout=out)
+            error = None
+        except CommandError as caught:
+            error = caught
+        return out.getvalue(), error
+
+    @override_settings(PAWKET_AI_ENABLED=False)
+    def test_refuses_to_run_without_ai(self):
+        with self.assertRaisesMessage(CommandError, 'AI is off'):
+            call_command('check_ai_answers', stdout=StringIO())
+
+    def test_reports_failures_and_leaves_database_unchanged(self):
+        from Pawket_Change_Application.management.commands.check_ai_answers import Verdict
+        self.claude.messages.create.return_value = text_response('Full-day daycare is $25.')
+        self.claude.messages.parse.return_value = parsed_response(Verdict(passed=True, reason='Fine.'))
+        output, error = self.run_command()
+        self.assertIn('PASS  daycare price', output)
+        self.assertIn('FAIL  overnight price', output)
+        self.assertIn('missing $45', output)
+        self.assertIn('FAIL  stay booking', output)
+        self.assertIn('no booking was prepared', output)
+        self.assertIn('check(s) failed', str(error))
+        self.assertFalse(Booking.objects.exists())
+
+    def test_judge_failures_are_reported(self):
+        from Pawket_Change_Application.management.commands.check_ai_answers import Verdict
+        self.claude.messages.create.return_value = text_response('Sure, 20% off!')
+        self.claude.messages.parse.return_value = parsed_response(Verdict(passed=False, reason='Invented a discount.'))
+        output, _ = self.run_command()
+        self.assertIn('FAIL  discount', output)
+        self.assertIn('Invented a discount.', output)
 
 
 class ChatHandoffTests(AITestCase):
