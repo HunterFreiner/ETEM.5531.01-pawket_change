@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 import os
+import sys
 from pathlib import Path
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -131,3 +132,14 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 CONTACT_PHONE = os.environ.get('PAWKET_CONTACT_PHONE', '')
 CONTACT_EMAIL = os.environ.get('PAWKET_CONTACT_EMAIL', '')
 CONTACT_ADDRESS = os.environ.get('PAWKET_CONTACT_ADDRESS', '')
+
+# Claude powers the Contact page assistant, contact message tags, and review moderation, summaries and reply drafts.
+# Without an API key (or with PAWKET_AI_ENABLED=false) every AI feature turns off and the site works as before.
+# The test suite never calls the real API.
+ANTHROPIC_API_KEY = os.environ.get('ANTHROPIC_API_KEY', '')
+PAWKET_AI_MODEL = os.environ.get('PAWKET_AI_MODEL', 'claude-haiku-5-5')
+PAWKET_AI_ENABLED = (
+    os.environ.get('PAWKET_AI_ENABLED', 'true').lower() == 'true'
+    and bool(ANTHROPIC_API_KEY)
+    and sys.argv[1:2] != ['test']
+)

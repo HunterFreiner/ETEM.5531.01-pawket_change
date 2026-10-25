@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}Contact Us | Pawket Change{% endblock %}
 
@@ -6,7 +7,7 @@
 <div class="container">
     <div class="contact-heading text-center mx-auto mb-4">
         <h2 class="page-title mb-2">Contact Us</h2>
-        <p class="lead mb-0">Questions about care, pricing, or a stay? Send us a message.</p>
+        <p class="lead mb-0">Questions about care, pricing, or a stay? {% if ai_enabled %}Ask our assistant for a quick answer, or send us a message.{% else %}Send us a message.{% endif %}</p>
     </div>
 
     {% if messages %}
@@ -61,6 +62,46 @@
         </div>
 
         <div class="col-lg-7">
+            {% if ai_enabled %}
+            <section class="contact-panel chat-panel p-4 mb-4" aria-labelledby="chat-heading" data-chat
+                     data-chat-url="{% url 'contact_chat' %}" data-handoff-url="{% url 'contact_chat_handoff' %}">
+                <h3 id="chat-heading" class="h4 service-name mb-2">Ask our assistant</h3>
+                <p class="chat-notice mb-3">
+                    This assistant is AI and can make mistakes. What you type is sent to Anthropic, the company that
+                    makes the AI, to write a reply. Please don't share private details like card numbers.
+                </p>
+
+                <div class="chat-log mb-3" role="log" aria-live="polite" aria-label="Chat messages" data-chat-log>
+                    <p class="chat-message chat-message-assistant">Hi! Ask me about our services, prices, hours, or booking a stay.</p>
+                </div>
+
+                <form class="chat-form d-flex gap-2" data-chat-form>
+                    {% csrf_token %}
+                    <label for="chat-input" class="visually-hidden">Your question</label>
+                    <input id="chat-input" class="form-control" type="text" maxlength="1000" autocomplete="off"
+                           placeholder="e.g. How much is an overnight stay?" required data-chat-input>
+                    <button type="submit" class="btn btn-pawket" data-chat-send>Send</button>
+                </form>
+
+                <button type="button" class="btn btn-link p-0 mt-3" data-handoff-open hidden>Send this conversation to our team</button>
+                <form class="chat-handoff mt-3" data-handoff-form hidden novalidate>
+                    <p class="mb-2">We'll email you back. Your chat is sent along with your message.</p>
+                    <div class="alert alert-danger" role="alert" data-handoff-error hidden></div>
+                    <div class="row g-2">
+                        <div class="col-sm-6">
+                            <label for="handoff-name" class="form-label">Name</label>
+                            <input id="handoff-name" name="name" class="form-control" autocomplete="name" maxlength="100" required>
+                        </div>
+                        <div class="col-sm-6">
+                            <label for="handoff-email" class="form-label">Email address</label>
+                            <input id="handoff-email" name="email" type="email" class="form-control" autocomplete="email" required>
+                        </div>
+                    </div>
+                    <button type="submit" class="btn btn-pawket mt-3">Send to our team</button>
+                </form>
+            </section>
+            {% endif %}
+
             <section class="contact-panel p-4" aria-labelledby="contact-form-heading">
                 <h3 id="contact-form-heading" class="h4 service-name mb-2">Send a message</h3>
                 <p class="mb-4">All fields are required.</p>
@@ -87,6 +128,9 @@
                     {% endfor %}
 
                     <button type="submit" class="btn btn-pawket btn-lg">Send message</button>
+                    {% if ai_enabled %}
+                        <p class="chat-notice mt-3 mb-0">We use AI to sort messages so urgent ones get answered first. Your message is sent to Anthropic for this.</p>
+                    {% endif %}
                 </form>
             </section>
         </div>
@@ -101,4 +145,5 @@
         successMessage.focus();
     }
 </script>
+{% if ai_enabled %}<script src="{% static 'chat.js' %}"></script>{% endif %}
 {% endblock %}

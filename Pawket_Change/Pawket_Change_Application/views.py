@@ -1,16 +1,29 @@
+import json
 import logging
+import time as clock
+from datetime import date, datetime
 
 from django.conf import settings
 from django.contrib import messages
 from django.db import DatabaseError
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404, redirect, render
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.template import loader
 from django.utils import timezone
+from django.views.decorators.http import require_POST
 
+from . import ai
 from .forms import BookingForm, ContactForm, ReviewEmailForm, ReviewForm, booked_slots
-from .models import Booking, Review, BUSINESS_HOURS, FULL_DAY_PRICE, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE, OVERNIGHT_PRICE
+from .models import ADD_ONS, BUSINESS_HOURS, PRICING_POLICIES, SERVICES, Booking, ContactMessage, Review
+
+# Limits for the Contact page chat, so one visitor can't run up the API bill.
+CHAT_MAX_TURNS = 20
+CHAT_MAX_MESSAGE_LENGTH = 1000
+CHAT_MESSAGES_PER_HOUR = 20
+CHAT_UNAVAILABLE_REPLY = (
+    "Sorry, I can't answer right now. You can send your question to our team with the form on this page."
+)
 
 
 logger = logging.getLogger(__name__)
@@ -22,29 +35,11 @@ def home(request):
 
 
 def services(request):
-    service_list = [
-        {'name': 'Full-Day Daycare', 'price': f'${FULL_DAY_PRICE}', 'unit': '/day', 'included': 'Supervised playtime, rest periods, and general care'},
-        {'name': 'Half-Day Daycare', 'price': f'${HALF_DAY_PRICE}', 'unit': '/day', 'included': f'Up to {HALF_DAY_MAX_HOURS} hours of supervised care'},
-        {'name': 'Overnight Boarding', 'price': f'${OVERNIGHT_PRICE}', 'unit': '/night', 'included': 'Overnight care, feeding, and daily activities'},
-        {'name': 'Basic Grooming', 'price': '$30', 'unit': '', 'included': 'Bath, brushing, and basic cleaning'},
-    ]
-    add_ons = [
-        {'name': 'Extra Walk (20 minutes)', 'price': '$10'},
-        {'name': 'Nail Trimming', 'price': '$12'},
-        {'name': 'One-on-One Playtime', 'price': '$8'},
-    ]
-    policies = [
-        'No membership required to use our services.',
-        'No hidden fees or mandatory add-ons.',
-        'Every service clearly lists what is included in the price.',
-        'You will see your total cost before you book.',
-        'Any additional charges are explained before you confirm your booking.',
-    ]
     template = loader.get_template('services.html')
     context = {
-        'services': service_list,
-        'add_ons': add_ons,
-        'policies': policies,
+        'services': SERVICES,
+        'add_ons': ADD_ONS,
+        'policies': PRICING_POLICIES,
     }
     return HttpResponse(template.render(context, request))
 
@@ -58,11 +53,12 @@ def contact(request):
     form = ContactForm(request.POST or None)
     if request.method == 'POST' and form.is_valid():
         try:
-            form.save()
+            contact_message = form.save()
         except DatabaseError:
             logger.exception('Unable to save a contact message.')
             form.add_error(None, 'We could not send your message right now. Please try again later.')
         else:
+            ai.tag_contact_message(contact_message)
             messages.success(
                 request,
                 'Thanks for reaching out. We received your message and will get back to you as soon as we can.',
@@ -75,8 +71,108 @@ def contact(request):
         'contact_phone': settings.CONTACT_PHONE or '314-555-0142',
         'contact_email': settings.CONTACT_EMAIL or 'hello@pawketchange.org',
         'contact_address': settings.CONTACT_ADDRESS or '100 Treat Street, St. Louis, MO 63101',
+        'ai_enabled': ai.is_enabled(),
     }
     return render(request, 'contact.html', context)
+
+
+def _clean_chat_history(raw_messages):
+    """Keep only well-formed text turns that alternate user/assistant and end with the user, or return None."""
+    if not isinstance(raw_messages, list) or not raw_messages:
+        return None
+    history = []
+    for item in raw_messages[-CHAT_MAX_TURNS:]:
+        if not isinstance(item, dict):
+            return None
+        role, content = item.get('role'), item.get('content')
+        if role not in ('user', 'assistant') or not isinstance(content, str) or not content.strip():
+            return None
+        history.append({'role': role, 'content': content.strip()[:CHAT_MAX_MESSAGE_LENGTH]})
+    while history and history[0]['role'] != 'user':
+        history.pop(0)
+    if not history or history[-1]['role'] != 'user':
+        return None
+    if any(a['role'] == b['role'] for a, b in zip(history, history[1:])):
+        return None
+    return history
+
+
+def _chat_rate_limited(request):
+    hour_ago = clock.time() - 3600
+    recent = [t for t in request.session.get('chat_times', []) if t > hour_ago]
+    if len(recent) >= CHAT_MESSAGES_PER_HOUR:
+        return True
+    request.session['chat_times'] = recent + [clock.time()]
+    return False
+
+
+def _read_json(request):
+    try:
+        return json.loads(request.body)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return None
+
+
+@require_POST
+def contact_chat(request):
+    data = _read_json(request)
+    history = _clean_chat_history(data.get('messages') if isinstance(data, dict) else None)
+    if history is None:
+        return JsonResponse({'error': 'Invalid chat message.'}, status=400)
+    if _chat_rate_limited(request):
+        return JsonResponse({
+            'reply': "You've sent a lot of messages in the last hour. Please send your question to our team with the form on this page.",
+            'booking': None,
+        }, status=429)
+    result = ai.chat_reply(history)
+    if result is None:
+        return JsonResponse({'reply': CHAT_UNAVAILABLE_REPLY, 'booking': None})
+    return JsonResponse(result)
+
+
+def _chat_transcript(history):
+    """The chat as a contact message, trimmed from the start so the latest turns fit in the message field."""
+    header = 'Sent from the website chat assistant.\n\n'
+    limit = ContactMessage._meta.get_field('message').max_length - len(header)
+    lines = [f'{"Customer" if turn["role"] == "user" else "Assistant"}: {turn["content"]}' for turn in history]
+    transcript = '\n\n'.join(lines)
+    if len(transcript) > limit:
+        transcript = '...' + transcript[-(limit - 3):]
+    return header + transcript
+
+
+@require_POST
+def contact_chat_handoff(request):
+    data = _read_json(request)
+    if not isinstance(data, dict):
+        return JsonResponse({'error': 'Invalid request.'}, status=400)
+    raw_messages = data.get('messages')
+    history = []
+    if isinstance(raw_messages, list):
+        history = [
+            {'role': m['role'], 'content': m['content'].strip()[:CHAT_MAX_MESSAGE_LENGTH]}
+            for m in raw_messages[-CHAT_MAX_TURNS:]
+            if isinstance(m, dict) and m.get('role') in ('user', 'assistant')
+            and isinstance(m.get('content'), str) and m['content'].strip()
+        ]
+    if not any(turn['role'] == 'user' for turn in history):
+        return JsonResponse({'errors': {'messages': ['Ask a question in the chat first.']}}, status=400)
+
+    form = ContactForm({
+        'name': data.get('name', ''),
+        'email': data.get('email', ''),
+        'message': _chat_transcript(history),
+    })
+    if not form.is_valid():
+        errors = {field: [str(error) for error in field_errors] for field, field_errors in form.errors.items()}
+        return JsonResponse({'errors': errors}, status=400)
+    try:
+        contact_message = form.save()
+    except DatabaseError:
+        logger.exception('Unable to save a chat handoff.')
+        return JsonResponse({'errors': {'__all__': ['We could not send this right now. Please try again later.']}}, status=500)
+    ai.tag_contact_message(contact_message)
+    return JsonResponse({'ok': True})
 
 
 def reviews(request):
@@ -113,14 +209,22 @@ def reviews(request):
                 else:
                     review.email = verified_email
                     success = 'Thanks for your review! It is now posted below.'
+                # If AI moderation is unavailable, the review is published as usual.
+                check = ai.moderate_review(review.name, review.rating, review.comment)
+                if check and not check.publish:
+                    review.status = Review.PENDING
+                    success = 'Thanks for your review! It will appear here after a quick check by our team.'
+                else:
+                    review.status = Review.PUBLISHED
                 review.save()
                 request.session.pop('review_email', None)
                 messages.success(request, success)
                 return redirect('reviews')
 
-    review_list = Review.objects.all()
+    review_list = Review.objects.filter(status=Review.PUBLISHED)
     context = {
         'reviews': review_list,
+        'review_summary': ai.review_summary(),
         'average_rating': review_list.aggregate(Avg('rating'))['rating__avg'],
         'email_form': email_form,
         'review_form': review_form,
@@ -140,7 +244,7 @@ def book(request):
                 return redirect('booking_confirmation', booking_id=booking.id)
             return render(request, 'booking_review.html', {'form': form, 'booking': form.instance})
     else:
-        form = BookingForm()
+        form = BookingForm(initial=_booking_prefill(request.GET))
     now = timezone.localtime()
     availability = {
         'booked': booked_slots(),
@@ -149,6 +253,22 @@ def book(request):
     }
     context = {'form': form, 'business_hours': BUSINESS_HOURS, 'availability': availability}
     return render(request, 'booking.html', context)
+
+
+def _booking_prefill(params):
+    """Booking details from a chat assistant link. Badly formatted values are dropped; the form checks the rest on submit."""
+    prefill = {}
+    for field in ('check_in_date', 'check_out_date'):
+        try:
+            prefill[field] = date.fromisoformat(params.get(field, ''))
+        except ValueError:
+            pass
+    for field in ('drop_off_time', 'pickup_time'):
+        try:
+            prefill[field] = datetime.strptime(params.get(field, ''), '%H:%M').strftime('%H:%M')
+        except ValueError:
+            pass
+    return prefill
 
 
 def booking_confirmation(request, booking_id):
