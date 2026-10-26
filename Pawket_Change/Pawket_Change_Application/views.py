@@ -1,19 +1,22 @@
 import json
+import hashlib
 import logging
 import time as clock
 from datetime import date, datetime
 
 from django.conf import settings
 from django.contrib import messages
-from django.db import DatabaseError, transaction
+from django.db import DatabaseError, IntegrityError, transaction
 from django.db.models import Avg
 from django.shortcuts import get_object_or_404, redirect, render
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.template import loader
 from django.utils import timezone
 from django.views.decorators.http import require_POST
+from django.views.decorators.cache import never_cache
 
 from . import ai
+from .notifications import queue_booking_notification
 from .forms import BookingForm, ContactForm, ReviewEmailForm, ReviewForm, booked_slots, pet_forms
 from .models import (
     ADD_ONS, BUSINESS_HOURS, FULL_DAY_PRICE, GROOMING_PRICES, GROOMING_SERVICES, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE,
@@ -283,10 +286,20 @@ def reviews(request):
 
 
 def book(request):
+    if not request.session.session_key:
+        request.session.create()
     if request.method == 'POST':
         form = BookingForm(request.POST)
         pets = pet_forms(request.POST)
         action = request.POST.get('action')
+        # Same session + same submitted data is one request, including double-clicks.
+        payload = sorted((key, request.POST.getlist(key)) for key in request.POST if key not in ('csrfmiddlewaretoken', 'action'))
+        submission_key = hashlib.sha256((request.session.session_key + json.dumps(payload)).encode()).hexdigest()
+        if action == 'confirm':
+            existing = Booking.objects.filter(submission_key=submission_key).first()
+            if existing:
+                _remember_booking(request, existing.pk)
+                return redirect('booking_confirmation', booking_id=existing.pk)
 
         if action != 'edit':
             booking_is_valid = form.is_valid()
@@ -296,11 +309,20 @@ def book(request):
 
             if booking_is_valid and pets_are_valid:
                 if action == 'confirm':
-                    with transaction.atomic():
-                        booking = form.save()
-                        for pet_form in active_pets:
-                            pet_form.instance.booking = booking
-                            pet_form.save()
+                    try:
+                        with transaction.atomic():
+                            booking = form.save(commit=False)
+                            booking.submission_key = submission_key
+                            booking.save()
+                            for pet_form in active_pets:
+                                pet_form.instance.booking = booking
+                                pet_form.save()
+                            queue_booking_notification(booking)
+                    except IntegrityError:
+                        booking = Booking.objects.filter(submission_key=submission_key).first()
+                        if booking is None:
+                            raise
+                    _remember_booking(request, booking.pk)
 
                     return redirect(
                         'booking_confirmation',
@@ -371,7 +393,15 @@ def _booking_prefill(params):
     return prefill
 
 
+def _remember_booking(request, booking_id):
+    ids = request.session.get('booking_ids', [])
+    request.session['booking_ids'] = list(dict.fromkeys(ids + [booking_id]))[-100:]
+
+
+@never_cache
 def booking_confirmation(request, booking_id):
+    if booking_id not in request.session.get('booking_ids', []) and not request.user.has_perm('Pawket_Change_Application.view_booking'):
+        raise Http404
     booking = get_object_or_404(Booking, id=booking_id)
 
     return render(
@@ -379,5 +409,9 @@ def booking_confirmation(request, booking_id):
         'booking_confirmation.html',
         {
             'booking': booking,
+            'notification': booking.notifications.first(),
+            'contact_email': settings.CONTACT_EMAIL,
+            'contact_phone': settings.CONTACT_PHONE,
+            'business_timezone': settings.TIME_ZONE,
         },
     )

@@ -1,7 +1,8 @@
 from django.contrib import admin, messages
 
 from . import ai
-from .models import Booking, ContactMessage, Pet, Review, ReviewSummary
+from .models import Booking, BookingNotification, ContactMessage, Pet, Review, ReviewSummary
+from .notifications import queue_booking_notification
 
 
 class PetInline(admin.StackedInline):
@@ -11,9 +12,28 @@ class PetInline(admin.StackedInline):
 
 @admin.register(Booking)
 class BookingAdmin(admin.ModelAdmin):
-    list_display = ['owner_name', 'email', 'phone', 'number_of_pets', 'check_in_date', 'grooming_date', 'created_at']
+    list_display = ['reference', 'owner_name', 'email', 'status', 'number_of_pets', 'check_in_date', 'grooming_date', 'created_at']
+    list_filter = ['status']
     search_fields = ['owner_name', 'email', 'phone', 'pets__name']
     inlines = [PetInline]
+
+    def save_related(self, request, form, formsets, change):
+        super().save_related(request, form, formsets, change)
+        if not change or 'status' in form.changed_data:
+            queue_booking_notification(form.instance)
+
+
+@admin.register(BookingNotification)
+class BookingNotificationAdmin(admin.ModelAdmin):
+    list_display = ['booking', 'booking_status', 'state', 'attempts', 'created_at', 'sent_at']
+    list_filter = ['state', 'booking_status']
+    readonly_fields = [field.name for field in BookingNotification._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(ContactMessage)

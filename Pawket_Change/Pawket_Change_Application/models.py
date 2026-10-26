@@ -58,6 +58,11 @@ PRICING_POLICIES = [
 
 
 class Booking(models.Model):
+    PENDING = 'pending'
+    CONFIRMED = 'confirmed'
+    STATUS_CHOICES = [(PENDING, 'Awaiting approval'), (CONFIRMED, 'Confirmed')]
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=PENDING)
+    submission_key = models.CharField(max_length=64, unique=True, null=True, blank=True, editable=False)
     owner_name = models.CharField(max_length=100, default='')
     email = models.EmailField()
     phone = models.CharField(max_length=20, default='')
@@ -97,6 +102,18 @@ class Booking(models.Model):
         if not self.includes_stay or not self.check_in_date or not self.check_out_date:
             return 0
         return (self.check_out_date - self.check_in_date).days
+
+    @property
+    def reference(self):
+        return f'PC-{self.pk:06d}'
+
+    @property
+    def stay_service_name(self):
+        if not self.includes_stay:
+            return ''
+        if self.nights:
+            return 'Overnight Boarding'
+        return 'Half-Day Daycare' if self.stay_cost_per_pet == HALF_DAY_PRICE else 'Full-Day Daycare'
 
     @property
     def length_of_stay(self):
@@ -163,6 +180,26 @@ class Booking(models.Model):
     @property
     def total_cost(self):
         return self.cost + self.grooming_cost
+
+
+class BookingNotification(models.Model):
+    """Durable outbox. Delivery status is independent of booking approval."""
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='notifications')
+    booking_status = models.CharField(max_length=12, choices=Booking.STATUS_CHOICES)
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+    state = models.CharField(max_length=12, default='pending', choices=[
+        ('pending', 'Pending'), ('sending', 'Sending'), ('sent', 'Accepted by mail server'),
+        ('failed', 'Failed'), ('preview', 'Development preview'),
+    ])
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
 
 
 class Pet(models.Model):
