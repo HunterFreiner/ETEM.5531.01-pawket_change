@@ -1,19 +1,38 @@
 
 {% extends 'base.html' %}
 
-{% block title %}Booking Requested | Pawket Change{% endblock %}
+{% block title %}{{ booking.get_status_display }} | Pawket Change{% endblock %}
 
 {% block content %}
 <div class="container text-center">
     <h2 class="page-title mb-3">
-        Booking Request Received!
+        {% if booking.status == 'confirmed' %}Your Booking Is Confirmed{% else %}Booking Request Received!{% endif %}
     </h2>
 
     <p class="lead tagline">
-        Thank you &mdash; we can't wait to see your pet.
+        Status: <strong>{{ booking.get_status_display }}</strong>
     </p>
 
-    <section class="mission mx-auto mt-4 p-4 text-start">
+    <section class="mission mx-auto mt-4 p-4 text-start" style="overflow-wrap: anywhere;">
+
+        <p>Booking reference: <strong>{{ booking.reference }}</strong></p>
+        {% if booking.status == 'confirmed' %}
+            <p>Your booking is confirmed. We look forward to welcoming your pet!</p>
+        {% else %}
+            <p>Your request has been submitted, but your booking is not confirmed yet. We will email you when it is approved.</p>
+        {% endif %}
+        <div role="status">
+        {% if notification.state == 'sent' %}
+            <p>Your notification has been accepted by our mail service for sending to {{ notification.recipient }}. If it does not arrive, check your spam folder or contact us.</p>
+        {% elif notification.state == 'failed' %}
+            <p>Your booking request was saved, but we could not send your email. Please keep your booking reference and contact us if you need help.</p>
+        {% elif notification.state == 'preview' %}
+            <p>Development preview only: no email has been sent to your inbox.</p>
+        {% else %}
+            <p>Your booking is saved. Email notification is pending.</p>
+        {% endif %}
+        </div>
+        <p class="small text-muted">All appointment times are in {{ business_timezone }}.</p>
 
         <p>
             Thanks, {{ booking.owner_name }}! Your booking request has been received for
@@ -32,6 +51,7 @@
 
         {% if booking.includes_stay %}
             <h3 class="page-title h5 mt-4">Stay Details</h3>
+            <p>Service: <strong>{{ booking.stay_service_name }}</strong></p>
 
             <p>
                 Your stay from
@@ -95,10 +115,11 @@
             <strong>${{ booking.total_cost }}</strong>
         </div>
 
-        <p class="small text-muted mt-3">
-            Your booking request has been received.
-            Appointment availability will be confirmed separately.
-        </p>
+        <h3 class="page-title h5 mt-4">Need to make a change</h3>
+        <p>Please include {{ booking.reference }} when contacting us.</p>
+        {% if contact_email %}<p>Email: <a href="mailto:{{ contact_email }}">{{ contact_email }}</a></p>{% endif %}
+        {% if contact_phone %}<p>Phone: <a href="tel:{{ contact_phone }}">{{ contact_phone }}</a></p>{% endif %}
+        <p><a href="{% url 'contact' %}">Contact Us</a> for changes or questions.</p>
 
         {% if booking.includes_stay %}
             <p class="mt-3 mb-0">
