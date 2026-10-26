@@ -1,0 +1,26 @@
+{% autoescape off %}Hi {{ booking.owner_name }},
+
+{% if booking.status == 'confirmed' %}Your booking is confirmed. We look forward to welcoming your pet!{% else %}Thanks for choosing Pawket Change! We have received your booking request. It is awaiting approval and is not confirmed yet. We will email you when it is approved.{% endif %}
+
+Booking reference: {{ booking.reference }}
+Status: {{ booking.get_status_display }}
+Dogs: {% for pet in booking.pets.all %}{{ pet.name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+Number of dogs: {{ booking.number_of_pets }}
+{% if booking.includes_stay %}Service: {{ booking.stay_service_name }}
+Drop-off: {{ booking.check_in_date|date:"F j, Y" }} at {{ booking.drop_off_time|time:"g:i A" }}
+Pick-up: {{ booking.check_out_date|date:"F j, Y" }} at {{ booking.pickup_time|time:"g:i A" }}
+Length of stay: {{ booking.length_of_stay }}
+{% endif %}{% if booking.grooming_services %}Grooming: {{ booking.grooming_service_names|join:", " }}
+{% if booking.includes_stay %}Grooming timing: During the requested stay.
+{% else %}Grooming appointment: {{ booking.grooming_date|date:"F j, Y" }} at {{ booking.grooming_time|time:"g:i A" }}
+{% endif %}{% endif %}All appointment times are in {{ business_timezone }}.
+Total quoted cost: ${{ booking.total_cost }}
+
+Need to request a change or ask a question? Please include your booking reference.
+{% if contact_email %}Email: {{ contact_email }}
+{% endif %}{% if contact_phone %}Phone: {{ contact_phone }}
+{% endif %}{% if not contact_email and not contact_phone %}Use the Contact Us form on the Pawket Change website.
+{% endif %}
+Thanks,
+The Pawket Change Team
+{% endautoescape %}
