@@ -1,7 +1,7 @@
 from django.contrib import admin, messages
 
 from . import ai
-from .models import Booking, ContactMessage, Pet, Review, ReviewSummary
+from .models import Booking, BookingNotification, ContactMessage, Pet, Review, ReviewSummary
 
 
 class PetInline(admin.StackedInline):
@@ -14,6 +14,19 @@ class BookingAdmin(admin.ModelAdmin):
     list_display = ['owner_name', 'email', 'phone', 'number_of_pets', 'check_in_date', 'grooming_date', 'created_at']
     search_fields = ['owner_name', 'email', 'phone', 'pets__name']
     inlines = [PetInline]
+
+
+@admin.register(BookingNotification)
+class BookingNotificationAdmin(admin.ModelAdmin):
+    list_display = ['booking', 'recipient', 'state', 'attempts', 'created_at', 'sent_at']
+    list_filter = ['state']
+    readonly_fields = [field.name for field in BookingNotification._meta.fields]
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(ContactMessage)

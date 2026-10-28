@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import ai
+from .notifications import queue_booking_notification
 from .forms import BookingForm, ContactForm, ReviewEmailForm, ReviewForm, booked_slots, pet_forms
 from .models import (
     ADD_ONS, BUSINESS_HOURS, FULL_DAY_PRICE, GROOMING_PRICES, GROOMING_SERVICES, HALF_DAY_MAX_HOURS, HALF_DAY_PRICE,
@@ -301,6 +302,7 @@ def book(request):
                         for pet_form in active_pets:
                             pet_form.instance.booking = booking
                             pet_form.save()
+                        queue_booking_notification(booking)
 
                     return redirect(
                         'booking_confirmation',
