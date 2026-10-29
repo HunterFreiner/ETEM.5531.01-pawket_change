@@ -137,6 +137,17 @@ CONTACT_PHONE = os.environ.get('PAWKET_CONTACT_PHONE', '')
 CONTACT_EMAIL = os.environ.get('PAWKET_CONTACT_EMAIL', '')
 CONTACT_ADDRESS = os.environ.get('PAWKET_CONTACT_ADDRESS', '')
 
+# Console output is a development preview, never evidence of delivery to an inbox.
+EMAIL_BACKEND = os.environ.get('PAWKET_EMAIL_BACKEND', 'django.core.mail.backends.console.EmailBackend')
+EMAIL_HOST = os.environ.get('PAWKET_EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('PAWKET_EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('PAWKET_EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('PAWKET_EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('PAWKET_EMAIL_USE_TLS', 'true').lower() == 'true'
+EMAIL_USE_SSL = os.environ.get('PAWKET_EMAIL_USE_SSL', 'false').lower() == 'true'
+EMAIL_TIMEOUT = 10
+DEFAULT_FROM_EMAIL = os.environ.get('PAWKET_DEFAULT_FROM_EMAIL', '')
+
 # Claude powers the Contact page assistant, contact message tags, and review moderation, summaries and reply drafts.
 # Without an API key (or with PAWKET_AI_ENABLED=false) every AI feature turns off and the site works as before.
 # The test suite never calls the real API.

@@ -144,10 +144,10 @@ class BookingViewTests(TestCase):
         booking = Booking.objects.get()
         self.assertRedirects(response, reverse('booking_confirmation', args=[booking.id]))
 
-    def test_confirmation_shows_received_and_cost(self):
+    def test_confirmation_shows_confirmed_and_cost(self):
         self.client.post(reverse('book'), {**booking_data(), 'action': 'confirm'})
         response = self.client.get(reverse('booking_confirmation', args=[Booking.objects.get().id]))
-        self.assertContains(response, 'has been received')
+        self.assertContains(response, 'Your booking is confirmed for')
         self.assertContains(response, '<span>Stay cost</span>')
         self.assertContains(response, '<strong>$90</strong>')
 
@@ -313,7 +313,7 @@ class GroomingStoryTests(TestCase):
         self.assertFalse(booking.includes_stay)
         self.assertEqual(booking.grooming_services, ['bath', 'nail_trimming'])
         self.assertEqual(booking.grooming_date.isoformat(), data['grooming_date'])
-        self.assertContains(response, 'Booking Request Received!')
+        self.assertContains(response, 'Your Booking Is Confirmed!')
         self.assertContains(response, '<li>Nail trimming</li>', html=True)
 
     def test_review_page_hidden_fields_resubmit_the_same_request(self):
@@ -409,7 +409,7 @@ class BookingDetailsStoryTests(TestCase):
 
     def test_confirmation_shows_submitted_request(self):
         response = self.client.post(reverse('book'), {**self.two_dogs(), 'action': 'confirm'}, follow=True)
-        self.assertContains(response, 'Booking Request Received!')
+        self.assertContains(response, 'Your Booking Is Confirmed!')
         for text in ('Thanks, Dez Calloway!', '314-555-0142', 'Biscuit', 'Mochi', 'Apoquel 16mg with breakfast',
                      'Please send a photo update', '<strong>$180</strong>'):
             self.assertContains(response, text)

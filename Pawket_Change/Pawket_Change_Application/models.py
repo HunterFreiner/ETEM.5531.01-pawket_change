@@ -99,6 +99,18 @@ class Booking(models.Model):
         return (self.check_out_date - self.check_in_date).days
 
     @property
+    def reference(self):
+        return f'PC-{self.pk:06d}'
+
+    @property
+    def stay_service_name(self):
+        if not self.includes_stay:
+            return ''
+        if self.nights:
+            return 'Overnight Boarding'
+        return 'Half-Day Daycare' if self.stay_cost_per_pet == HALF_DAY_PRICE else 'Full-Day Daycare'
+
+    @property
     def length_of_stay(self):
         if not self.includes_stay:
             return 'Grooming appointment'
@@ -163,6 +175,25 @@ class Booking(models.Model):
     @property
     def total_cost(self):
         return self.cost + self.grooming_cost
+
+
+class BookingNotification(models.Model):
+    """Durable outbox for booking request emails, so a failed send never loses the booking."""
+    booking = models.ForeignKey(Booking, on_delete=models.CASCADE, related_name='notifications')
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=200)
+    body = models.TextField()
+    state = models.CharField(max_length=12, default='pending', choices=[
+        ('pending', 'Pending'), ('sending', 'Sending'), ('sent', 'Accepted by mail server'),
+        ('failed', 'Failed'), ('preview', 'Development preview'),
+    ])
+    attempts = models.PositiveIntegerField(default=0)
+    last_error = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at', '-pk']
 
 
 class Pet(models.Model):
